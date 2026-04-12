@@ -1,0 +1,24 @@
+stages:
+  - test
+
+migrations-test:
+  stage: test
+  image: golang:1.24-alpine
+  services:
+    - name: postgres:16-alpine
+      alias: postgres
+  variables:
+    POSTGRES_DB: testdb
+    POSTGRES_USER: postgres
+    POSTGRES_PASSWORD: postgres
+    GOOSE_DRIVER: postgres
+    GOOSE_DBSTRING: "host=postgres user=postgres password=postgres dbname=testdb sslmode=disable"
+    GOOSE_MIGRATION_DIR: "./migrations"
+  before_script:
+    - go install github.com/pressly/goose/v3/cmd/goose@latest
+  script:
+    - goose up
+    - goose down-to 0
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

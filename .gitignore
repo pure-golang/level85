@@ -1,0 +1,7 @@
+.coverage
+
+plans/
+
+.agents/skills/skill-creator
+skills-lock.json
+scripts/sync-repos.sh
