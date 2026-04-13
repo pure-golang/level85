@@ -1,50 +1,65 @@
 ---
 name: "x-new-adapter"
-description: "Чеклист добавления нового адаптера: структура, doc.go, Config, интерфейс, тесты"
-compatibility: git.korputeam.ru/newbackend/adapters
+description: "Применяй когда добавляешь новый инфраструктурный адаптер: выбор места в дереве, `doc.go`, `Config`, конструктор, lifecycle-контракт, observability и тесты"
+compatibility: ../adapters
 ---
-# Добавление нового адаптера
 
-## Чеклист (выполнять по порядку)
+# Новый адаптер
 
-1. **Структура директорий**: `{тип_адаптера}/{имя_адаптера}/`
-   - Примеры: `queue/nats/`, `db/pg/pgxpool/`, `storage/gcs/`
+Этот skill — orchestration-skill для нового adapter package. Он собирает workflow и указывает на owner-skills, а не пересказывает их.
 
-2. **doc.go**: создай документацию пакета (см. скилл `x-doc-go` для формата)
+## Когда применять
 
-3. **Config struct**: добавь теги `envconfig` для всех полей
-   ```go
-   type Config struct {
-       Host    string        `envconfig:"MYSERVICE_HOST" default:"localhost"`
-       Port    int           `envconfig:"MYSERVICE_PORT" default:"1234"`
-       Timeout time.Duration `envconfig:"MYSERVICE_TIMEOUT" default:"10s"`
-   }
-   ```
+- создаёшь новый adapter package вроде `queue/...`, `storage/...`, `db/...`, `executor/...`
 
-4. **Интерфейс**: реализуй `Provider` (или `RunableProvider` для долгоживущих процессов)
-   ```go
-   type Provider interface {
-       Start() error
-       io.Closer
-   }
-   ```
+Не применяй для:
+- service/repo/controller пакетов прикладного сервиса
+- доменной логики без внешней зависимости
 
-5. **Конструктор**: экспортируй конструктор возвращающий конкретный тип (никогда не ошибку)
-   - `New(cfg Config)` — если в пакете один основной тип
-   - `New<Name>(cfg Config)` — если типов несколько (`NewReader`, `NewWriter` и т.п.)
-   - Ошибки соединения/инициализации откладываются до `Start()` или `Connect()`
+## Core workflow
 
-6. **Трейсинг OpenTelemetry**: добавь spans для всех операций (см. скилл `x-observability`)
-   ```go
-   var tracer = otel.Tracer("git.korputeam.ru/newbackend/adapters/{path}")
-   // Именование span: packageName.Operation (например, "myadapter.Get")
-   ```
+### 1. Выбери место в дереве пакетов
 
-7. **README.md**: примеры использования на русском
+Если нужна совместимость с legacy-экосистемой `../adapters`, используй её только как карту текущего API.
 
-9. **Юнит-тесты**: покрой основную логику без внешних сервисов
+### 2. Оформи package contract
 
-10. **Интеграционные тесты**: используй `testcontainers-go` если нужен внешний сервис
-    - См. скилл `x-integration-testing`
+- прочитай ближайший родительский `doc.go`
+- создай или обнови `doc.go` нового пакета
+- детали структуры `doc.go` бери из `x-doc-go`
 
-11. **Обнови AGENTS.md**: если введены новые паттерны — добавь ссылки
+### 3. Оформи `Config` и lifecycle
+
+- `Config` через env workflow из `x-env-config`
+- конструктор без I/O
+- явные `Start()/Connect()/Run()/Close()`, если lifecycle нужен
+
+### 4. Подключи observability только через owner-skills
+
+- logging policy → `x-log`
+- tracing/metrics/bootstrap → `x-observability`
+
+### 5. Покрой тестами
+
+- unit рядом с кодом
+- integration через `x-integration-testing`, если нужен реальный внешний сервис
+
+## Короткий чек-лист
+
+- пакет лежит в правильном месте дерева
+- `doc.go` описывает пакет
+- `Config` и lifecycle оформлены явно
+- конструктор не делает I/O
+- тестовый слой выбран осознанно
+
+## References
+
+- `assets/adapter-package/` — прозрачный стартовый каркас нового пакета
+
+## Смежные skills
+
+- `x-doc-go`
+- `x-env-config`
+- `x-log`
+- `x-observability`
+- `x-integration-testing`

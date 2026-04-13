@@ -1,8 +1,10 @@
 ---
 name: "x-doc-go"
-description: "Что делать при создании или изменении пакета: требования к doc.go, формат, обязательные секции, doc-комментарии экспортируемых символов"
+description: "Применяй при создании нового пакета или изменении существующего package contract: наличие `doc.go`, структура package comment, секция `Конфигурация`, ограничения и doc-комментарии экспортируемых символов"
 ---
 # doc.go
+
+Если нужен быстрый smoke-check пакета, используй `scripts/check-doc-go.sh <package-dir>`.
 
 ## Шаг 1: Проверь наличие doc.go
 
@@ -64,7 +66,7 @@ func (s *Service) CreatePoint(ctx context.Context, x, y float64) (*domain.Point,
 
 **Проверка** — найди экспортируемые символы без doc-комментария:
 ```
-grep -rn "^func \|^type " --include="*.go" . | grep -v "_test.go" | grep -v "/mocks/"
+rg -n "^(func|type) " -g '*.go' -g '!**/*_test.go' -g '!**/mocks/**' .
 ```
 Для каждого символа с заглавной буквы убедись, что строкой выше есть `// ИмяСимвола ...`.
 
@@ -88,3 +90,15 @@ grep -rn "^func \|^type " --include="*.go" . | grep -v "_test.go" | grep -v "/mo
 //	REDIS_DB       — номер базы данных (default: 0)
 package redis
 ```
+
+## Не делай
+
+- не заменяй `doc.go` на `README.md` внутри пакета
+- не оставляй `doc.go` в состоянии, которое уже не совпадает с кодом
+- не пропускай секцию `Ограничения`, если пакет требует `Close()`, lifecycle или special order of calls
+- не пиши doc-комментарии экспортируемых символов на английском
+
+## Полезные ресурсы
+
+- `references/package-contract-examples.md` — короткие эталонные варианты `doc.go` для разных типов пакетов
+- `scripts/check-doc-go.sh` — проверка наличия и базовой структуры `doc.go`

@@ -1,77 +1,153 @@
 ---
 name: x-mockery
-description: "Применяй когда нужно объявить интерфейс для мока и сгенерировать его через go generate"
-compatibility: github.com/vektra/mockery v2+, github.com/stretchr/testify v1+
+description: "Применяй когда в unit-тесте нужен мок интерфейсной зависимости: объяви частично применяемый интерфейс у потребителя, добавь пакет в корневой `.mockery.yml` и сгенерируй мок через mockery v3 + testify"
+compatibility: github.com/vektra/mockery v3+, github.com/stretchr/testify v1+
 ---
 
 ## Смежные скиллы
 
-- `x-unit-test-partial-interface` — как применять моки в юнит-тестах с частично применяемыми интерфейсами
-- `x-unit-test-callbacks` — когда вместо интерфейса используются колбеки (`type alias = func(...)`)
+- `x-unit-test-partial-interface` — как применять consumer-side interfaces и callback dependencies в unit-тестах
 
-## Требование
+## Когда применять
 
-Перед выполнением убедись, что пользователь подключил MCP-инструмент **context7**. Если не подключён — попроси подключить его, прежде чем продолжать. Context7 нужен для чтения актуальной документации `github.com/vektra/mockery` и `github.com/stretchr/testify`.
+Используй этот скилл, когда зависимость должна мокаться через `testify/mock`.
 
-## Объявление интерфейса для мока
+Этот скилл описывает проектный путь работы с `mockery v3`, а не полный справочник возможностей `mockery`.
 
-В файле тестируемого пакета (не в отдельном пакете), после импортов:
+Перед запуском этого скилла обязательно проверь, доступен ли skill `context7-cli`.
+Это обязательное условие запуска: текущий workflow опирается на возможность быстро проверить актуальную документацию `mockery` и `testify`.
+
+Если `context7-cli` недоступен:
+- остановись
+- явно сообщи пользователю, что обязательный skill для `x-mockery` не подключён
+- не продолжай стандартный сценарий "по памяти"
+
+Если задача выходит за рамки описанного здесь паттерна:
+- сначала сохраняй проектные инварианты из этого скилла
+- используй `context7-cli` для проверки актуальной документации `mockery` и `testify`
+
+Не используй `mockery` для:
+- колбеков (`type alias = func(...)`) — см. `x-unit-test-partial-interface`, раздел про callback alias
+- автогенерируемых интерфейсов, которые проект не хранит под контролем вручную
+
+## Объявление интерфейса
+
+Объявляй интерфейс в пакете, который его потребляет. Обычно это частично применяемый локальный интерфейс рядом с тестируемым кодом:
 
 ```go
-//go:generate mockery --name=someRepo --exported
-type someRepo interface {
-    GetItem(id int64) (*entity.Item, error)
-    SaveItem(item *entity.Item) error
+type pointRepo interface {
+    GetByID(ctx context.Context, id string) (*domain.Point, error)
+    Save(ctx context.Context, point domain.Point) error
 }
 ```
 
 Правила:
-- `//go:generate` — строго над объявлением интерфейса
-- `--exported` → мок генерируется в `mocks/` с заглавной буквы (`SomeRepo`)
-- Имя интерфейса — строчными буквами: не переиспользуется из других пакетов
-- `.mockery.yaml` должен содержать `with-expecter: true`
+- предпочитай минимальный интерфейс под потребителя, а не общий "god interface"
+- если интерфейс нужен только внутри пакета, оставляй имя неэкспортируемым
+- не добавляй `//go:generate mockery ...` над интерфейсом: для `v3` генерация централизована
 
-```yaml
-# .mockery.yaml — минимальный конфиг
-with-expecter: true
-```
+## Конфиг mockery v3
+
+Корневой `.mockery.yml` — источник правды для генерации. Типовой шаблон конфига и package scoping вынесены в `references/mockery-config-patterns.md`.
+
+Правила:
+- следуй имени конфиг-файла, принятому в проекте; в текущем паттерне используется `.mockery.yml`
+- `template: testify` обязателен: он генерирует `EXPECT()`, конструктор `New<Type>(t)` и типизированные методы для вызовов
+- `template-data.unroll-variadic: true` держи включённым, если проект уже использует этот паттерн
+- `packages:` перечисляет пакеты, где разрешена генерация моков
+- если пакет уже указан с `all: true`, новый интерфейс подхватится автоматически
+- если интерфейс добавлен в новый пакет, сначала добавь этот пакет в `.mockery.yml`
+- не смешивай этот подход с точечными CLI-флагами на отдельных интерфейсах: источник правды должен оставаться в `.mockery.yml`
 
 ## Генерация
 
+Для быстрого post-check после генерации можно использовать `scripts/check-mockery-targets.sh`.
+
+Пример вызова:
+
 ```bash
-go generate ./...
+bash .agents/skills/x-mockery/scripts/check-mockery-targets.sh internal/service PointRepo .mockery.yml
 ```
 
-Файл появится в `mocks/SomeRepo.go`. Не редактировать вручную.
+Предпочитай проектную задачу:
+
+```bash
+task mock
+```
+
+Если в репозитории ещё нет задачи, эквивалентный вызов для `v3`:
+
+```bash
+go run github.com/vektra/mockery/v3@latest
+```
+
+Результат обычно появляется рядом с пакетом интерфейса:
+
+```text
+internal/service/mocks/point_repo.go
+```
+
+НЕ РЕДАКТИРУЙ сгенерированные файлы вручную.
 
 ## Создание мока в тесте
 
 ```go
-repo := mocks.NewSomeRepo(t)
+repo := mocks.NewPointRepo(t)
 ```
 
-`t` передаётся в конструктор — mockery автоматически проверит, что все заявленные ожидания выполнены по завершении теста.
+`mockery v3` с шаблоном `testify` регистрирует `t.Cleanup(...)` внутри конструктора, поэтому ожидания проверяются автоматически в конце теста.
 
 ## EXPECT() API
 
-`EXPECT()` и цепочка вызовов генерируются mockery. 
+Пример ожиданий:
 
 ```go
-// Точное совпадение аргумента
-repo.EXPECT().GetItem(int64(1)).Return(&entity.Item{}, nil)
-
-// Любой аргумент
-repo.EXPECT().GetItem(mock.Anything).Return(nil, assert.AnError)
-
-// Ровно один вызов - (дефолтный .Once() не указывай)
-repo.EXPECT().GetItem(int64(1)).Return(&entity.Item{}, nil)
-
-// Ровно N вызовов
-repo.EXPECT().SaveItem(mock.Anything).Return(nil).Times(3)
-
-// НЕ ИСПОЛЬЗУЙ в финальном тесте — только для временной заглушки при разработке
-repo.EXPECT().GetItem(mock.Anything).Return(nil, nil).Maybe()
+repo.EXPECT().GetByID(mock.Anything, "p1").Return(&domain.Point{ID: "p1"}, nil)
+repo.EXPECT().Save(mock.Anything, mock.Anything).Return(assert.AnError)
+repo.EXPECT().Save(mock.Anything, mock.Anything).Return(nil).Times(3)
 ```
 
-> **Запрет**: не генерируй `.Maybe()` без явного запроса пользователя. Наличие `.Maybe()` в финальном тесте — ошибка: expectation теряет смысл, молчаливо пропускает непроверенные вызовы.
+Один вызов — дефолтное поведение. `.Once()` избыточен, не пиши его.
 
+Если для контракта теста важна кратность больше одного вызова, указывай её явно через `.Times(n)`.
+
+`.Maybe()` не используй без явного запроса пользователя. В финальном тесте это почти всегда признак размытого контракта.
+
+## RunAndReturn
+
+`RunAndReturn` особенно полезен, когда мок должен вернуть результат, зависящий от аргументов вызова:
+
+```go
+repo.EXPECT().
+    GetByID(mock.Anything, "p1").
+    RunAndReturn(func(ctx context.Context, id string) (*domain.Point, error) {
+        return &domain.Point{ID: id}, nil
+    })
+```
+
+Используй `RunAndReturn`, когда нужно:
+- вычислить результат от входных аргументов
+- проверить типизированные аргументы без ручной распаковки `mock.Arguments`
+- удобно работать с variadic-методами, если включён `unroll-variadic: true`
+
+Для простых кейсов предпочитай обычный `.Return(...)`.
+
+## Проверка после генерации
+
+После `task mock` проверь:
+- мок появился в `mocks/` рядом с пакетом интерфейса
+- имя файла в `snake_case`, имя структуры в `PascalCase`
+- конструктор `New<Type>(t)` и метод `EXPECT()` сгенерировались
+- тесты компилируются без ручных правок сгенерированного файла
+
+## Не делай
+
+- не объявляй интерфейс в пакете поставщика зависимости только ради теста потребителя
+- не используй `.Once()` для одиночного вызова
+- не редактируй сгенерированные `mocks/*.go` вручную
+- не держи параллельно несколько источников правды для генерации (`.mockery.yml` и точечные `//go:generate`)
+
+## Полезные ресурсы
+
+- `references/mockery-config-patterns.md` — варианты `.mockery.yml`, package scoping и post-check паттерны
+- `scripts/check-mockery-targets.sh` — проверка `.mockery.yml`, `mocks/*.go`, `EXPECT()` и `New<Type>(t)` после генерации

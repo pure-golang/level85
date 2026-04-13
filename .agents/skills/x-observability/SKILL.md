@@ -1,83 +1,83 @@
 ---
 name: "x-observability"
-description: "Что делать при добавлении новой операции или адаптера: трейсинг, логирование, метрики, порядок middleware"
+description: "Применяй когда добавляешь новую внешнюю операцию, adapter package или server middleware: bootstrap monitoring через `../platform/monitoring`, tracer/meter в пакете, метрики и порядок HTTP/gRPC/GraphQL observability"
+compatibility: ../platform, ../adapters
 ---
+
 # Observability
 
-## Политика ошибок инициализации
+Этот skill — **канонический владелец** observability policy:
+- app bootstrap через `monitoring.InitDefault`
+- package-level tracer/meter
+- span naming и технические атрибуты
+- meaningful metrics
+- порядок HTTP/gRPC/GraphQL middleware/interceptors
 
-Ошибка инициализации адаптера наблюдаемости (Tracing, Metrics) **не должна останавливать приложение**.
+Логирование как таковое принадлежит `x-log`.
 
-Вызывающий код обязан обработать её как `warn`, но не `fatal` — мониторинг не должен влиять на доступность сервиса.
+## Когда применять
 
-```go
-provider, err := tracing.New(cfg)
-if err != nil {
-    logger.Warn(ctx, "failed to init tracing", "error", err)
-    // продолжаем без трейсинга
-}
-```
+- добавляешь новый adapter или внешний вызов
+- инструментируешь HTTP/gRPC/GraphQL слой
+- настраиваешь monitoring bootstrap
 
-## Шаг 1: Добавь трейсинг
+## Core workflow
 
-Объяви tracer как переменную пакета:
-```go
-var tracer = otel.Tracer("git.korputeam.ru/newbackend/adapters/db/pg/sqlx")
-```
+### 1. Инициализируй monitoring на уровне приложения
 
-В каждом публичном методе создай span:
-```go
-ctx, span := tracer.Start(ctx, "packageName.OperationName")
-defer span.End()
-```
-
-Именование: `packageName.Operation` — например `sqlx.Get`, `S3.Put`, `rabbitmq.Publish`.
-
-Для операций с БД добавь стандартные атрибуты:
-```go
-span.SetAttributes(
-    attribute.String("db.system", "postgresql"),
-    attribute.String("db.operation", "Get"),
-    attribute.String("db.statement", sqlQuery),
-    attribute.Bool("db.transaction", isInTx),
-)
-```
-
-## Шаг 2: Залогируй ошибки
-
-> **Подробности логирования:** см. скилл `x-log` — инициализация, обёртки, именование модулей.
-
-## Порядок middleware (HTTP)
-
-Применяй когда **настраиваешь сервер**. Порядок — от внешнего к внутреннему:
-
-1. **Monitoring** — трейсинг, метрики, логирование запросов
-2. **Recovery** — перехват паник
-3. **Auth / прикладные middleware**
-4. **Обработчик приложения**
-
-**Почему Monitoring снаружи Recovery:** если обработчик паникует, Recovery превращает панику в ответ 500. Monitoring снаружи видит этот 500 — паника попадает в метрики и трейсы. Если Recovery снаружи, Monitoring не увидит паниковавший запрос.
+Ориентируйся на `../platform/monitoring`:
 
 ```go
-amiddleware.Chain(
-    mux,
-    amiddleware.Monitoring("/other"),
-    amiddleware.Recovery,
-    platformjwt.NewMiddleware(cfg.Auth.JWTSecret, cfg.Auth.JWTExpiration,
-        platformjwt.WithSkipPaths("/live", "/health", "/other"),
-    ),
-)
+closeMonitoring := monitoring.InitDefault(cfg)
+defer func() {
+    if err := closeMonitoring(); err != nil {
+        slog.Default().Warn("failed to close monitoring", slog.Any("err", err))
+    }
+}()
 ```
 
-### gRPC — аналогичный порядок
+Сбой telemetry не должен останавливать приложение.
+
+### 2. В пакете объявляй один tracer и один meter
 
 ```go
-grpc.NewServer(
-    grpc.ChainUnaryInterceptor(
-        recovery.UnaryServerInterceptor(),
-        tracing.UnaryServerInterceptor(),
-        logging.UnaryServerInterceptor(),
-        metrics.UnaryServerInterceptor(),
-    ),
-)
+var tracer = otel.Tracer("github.com/pure-golang/project/internal/repo")
+var meter = otel.Meter("github.com/pure-golang/project/internal/repo")
 ```
+
+Span name: `packageName.Operation`, например `sqlx.Get`, `S3.Put`, `rabbitmq.Publish`.
+
+### 3. Добавляй только meaningful сигналы
+
+- span для внешней операции
+- технические атрибуты там, где они реально помогают расследованию
+- метрики только там, где пакет владеет meaningful request/error/latency signal
+
+### 4. Соблюдай порядок server observability
+
+- HTTP: monitoring внешний, recovery после него
+- gRPC: следуй project middleware order из `../adapters/grpc/middleware`
+- GraphQL: не теряй parent HTTP span, если GraphQL сидит поверх HTTP
+
+Короткая самопроверка для server layers — `references/http-grpc-graphql.md`.
+
+### 5. Помни о process-wide state в тестах
+
+Если unit-тест меняет global OpenTelemetry state, не ставь `t.Parallel()`. Общие правила test-layer принадлежат `x-testing-conventions`.
+
+## Короткий чек-лист
+
+- monitoring bootstrap собран через `monitoring.InitDefault`
+- tracer/meter не создаются на каждый вызов
+- span name согласован с `packageName.Operation`
+- метрики добавлены только там, где сигнал действительно принадлежит пакету
+- middleware order не придуман вручную
+
+## References
+
+- `references/http-grpc-graphql.md`
+
+## Смежные skills
+
+- `x-log`
+- `x-testing-conventions`

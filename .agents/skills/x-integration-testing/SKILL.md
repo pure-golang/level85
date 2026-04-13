@@ -1,6 +1,7 @@
 ---
 name: "x-integration-testing"
 description: "Применяй когда тест требует внешнего сервиса (БД, брокер, хранилище): testcontainers-go, setup/teardown контейнера, context timeout"
+compatibility: github.com/testcontainers/testcontainers-go, github.com/stretchr/testify v1+
 ---
 # Интеграционные тесты
 

@@ -1,51 +1,100 @@
 ---
 name: "x-env-config"
-description: "Что делать при добавлении конфигурации: Config struct, envconfig-теги, загрузка из .env"
-compatibility: git.korputeam.ru/newbackend/adapters
+description: "Применяй когда нужно добавить или изменить конфигурацию через env: `Config` struct, теги `envconfig`, вложенные adapter/platform config, загрузка через `env.InitConfig`, `.env`, `doc.go` и тесты конфигурации"
+compatibility: ../adapters
 ---
-# Environment Configuration
 
-## Шаг 1: Объяви Config struct
+# Конфигурация через env
 
-Каждое поле — с тегами `envconfig`, `default` или `required`:
+## Когда применять
+
+Используй этот скилл, когда:
+- добавляешь новый `Config` в адаптере или пакете инфраструктуры
+- расширяешь существующую конфигурацию новыми env-переменными
+- переносишь хардкод в конфиг
+
+Не применяй для:
+- значений, которые живут только в runtime одного запроса
+- параметров, которые удобнее передавать обычным аргументом функции
+
+## Workflow
+
+Если нужно быстро проверить согласованность `Config` / `doc.go` / `.env`, используй `scripts/check-env-config.py`.
+
+Пример вызова:
+
+```bash
+python3 .agents/skills/x-env-config/scripts/check-env-config.py internal/config/config.go internal/config/doc.go .env
+```
+
+### 1. Объяви `Config`
 
 ```go
 type Config struct {
-    Host    string        `envconfig:"SERVICE_HOST"     default:"localhost"`
-    Port    int           `envconfig:"SERVICE_PORT"     default:"5432"`
-    Password string       `envconfig:"SERVICE_PASSWORD" required:"true"`
-    Timeout time.Duration `envconfig:"SERVICE_TIMEOUT"  default:"10s"`
+    Host     string        `envconfig:"REDIS_HOST" default:"localhost"`
+    Port     int           `envconfig:"REDIS_PORT" default:"6379"`
+    Password string        `envconfig:"REDIS_PASSWORD"`
+    Timeout  time.Duration `envconfig:"REDIS_TIMEOUT" default:"10s"`
 }
 ```
 
-Теги:
-- `envconfig:"VAR_NAME"` — имя переменной окружения
-- `required:"true"` — падать если не задана
-- `default:"value"` — значение по умолчанию
+Правила:
+- имя переменной должно быть стабильным и привязанным к компоненту: `REDIS_*`, `S3_*`, `PG_*`
+- безопасные локальные значения можно задавать через `default`
+- секреты не делай `required:"true"` автоматически: сначала проверь, существует ли безопасный noop/local режим
+- длительности задавай строкой (`"5s"`, `"1m"`)
 
-## Шаг 2: Загрузи конфиг
+### 2. Загрузи конфиг через `env.InitConfig`
 
 ```go
 var cfg Config
 if err := env.InitConfig(&cfg); err != nil {
-    // handle error
+    return fmt.Errorf("failed to load redis config: %w", err)
 }
 ```
 
-`env.InitConfig` загружает `.env` из корня проекта (через `godotenv`), затем парсит переменные через `envconfig`.
+Что делает `env.InitConfig` в `../adapters/env`:
+- пытается загрузить `.env` из текущей директории
+- не падает, если `.env` нет
+- парсит переменные окружения в структуру через `envconfig`
 
-## Шаг 3: Добавь переменные в .env
-
-Паттерн именования: `COMPONENT_FIELD`:
+### 3. Обнови `.env` и пример значений
 
 ```bash
-# Пример
-SERVICE_HOST=localhost
-SERVICE_PORT=5432
-SERVICE_PASSWORD=secret
-SERVICE_TIMEOUT=10s
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+REDIS_TIMEOUT=10s
 ```
 
-## Шаг 4: Задокументируй в doc.go
+### 4. Задокументируй переменные
 
-Все переменные из Config struct должны быть перечислены в секции `Конфигурация:` файла `doc.go` пакета. См. скилл `x-doc-go`.
+Все поля `Config` перечисляй в секции `Конфигурация:` файла `doc.go`.
+Для деталей по корневому `Config`, вложенным конфигам и policy для `doc.go` см. `references/config-doc-patterns.md`.
+Для формата комментария пакета см. `x-doc-go`.
+
+Если корневой `Config` содержит вложенные adapter/platform-конфиги, перечисли верхнеуровневые переменные явно и укажи, где смотреть остальные.
+
+### 5. Проверь edge cases
+
+Проверь минимум:
+- загрузку значений по умолчанию
+- ошибку на обязательном поле, если оно действительно обязательно
+- корректный парсинг `time.Duration`, `bool`, `int`
+- поведение unit-теста с `t.Setenv` без `t.Parallel()`
+- поведение теста с `.env` и `os.Chdir()` без параллельного запуска, если проверяешь загрузку из cwd
+
+Если тест на конфиг меняет env процесса или рабочую директорию, это уже process-wide state.
+Не ускоряй такой тест через `t.Parallel()`: сначала обеспечь cleanup, а для общих правил см. `x-testing-conventions` и `references/parallel-safety.md`.
+
+## Не делай
+
+- не смешивай env-настройки и пост-конструкторную мутацию полей
+- не используй разные префиксы для одного и того же компонента
+- не прячь обязательные env-переменные в коде без отражения в `doc.go`
+- не дублируй полный список env из вложенных зависимостей, если достаточно сослаться на их конфиг
+
+## Полезные ресурсы
+
+- `references/config-doc-patterns.md` — паттерны для корневого `Config`, вложенных конфигов, `doc.go` и legacy env migration
+- `scripts/check-env-config.py` — проверка согласованности `envconfig` тегов, `doc.go` и `.env`

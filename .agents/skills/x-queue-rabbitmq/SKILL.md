@@ -1,82 +1,114 @@
 ---
 name: "x-queue-rabbitmq"
-description: "Паттерны RabbitMQ: Topology/Definitions, Publisher, Subscriber (retry via x-death), MultiQueueSubscriber"
-compatibility: git.korputeam.ru/newbackend/adapters
+description: "Применяй когда проектируешь publisher/subscriber для RabbitMQ через API `../adapters/queue/rabbitmq`: `Definitions`, `NewPublisher2`, `NewSubscriber2`, retry через `x-death`, DLQ и `MultiQueueSubscriber`"
+compatibility: ../adapters
 ---
-# Паттерны очередей (RabbitMQ)
 
-## Фиксировать hostname для durable+persistent queues
+# RabbitMQ
 
-RabbitMQ хранит данные по имени узла (`rabbit@<hostname>`).
-Если hostname меняется при рестарте — узел не находит свои данные.
+## Когда применять
 
-```yaml
-# docker-compose.yml
-rabbitmq:
-  image: rabbitmq:3.12-management-alpine
-  hostname: korpu-rabbitmq-node-1  # фиксированный hostname = стабильное имя узла
-```
+Используй этот скилл, когда работаешь с очередями, routing key, DLQ и topology через `../adapters/queue/rabbitmq`.
 
-## Topology (Definitions)
+Не применяй для:
+- Kafka topic/group сценариев
+- логики, где retry должен управляться возвращаемым `bool` из handler
 
-`Definitions` повторяет формат JSON management API RabbitMQ:
-- `.JSON()` → `rabbitmq_definitions.json` для docker-compose `load_definitions` / `rabbitmqctl import_definitions`
-- `.applyDefinitions(ch *amqp.Channel)` → объявление напрямую через AMQP (вспомогательный метод только для тестов, определён в `topology_helpers_test.go`)
+## 1. Зафиксируй topology
 
-См. `queue/rabbitmq/README.md` для полного примера DLX топологии.
+Для устойчивого deploy/test паттерна используй `Definitions`.
+Это основной способ описать:
+- exchanges
+- queues
+- bindings
+- retry/DLQ topology
 
-## Publisher
+`Definitions` годится и для:
+- JSON-файла через `definitions.JSON()` под management API / `load_definitions`
+- прямого применения topology в тестах
 
-Сигнатура конструктора:
-```go
-NewPublisher(dialer, PublisherConfig{
-    Exchange:     "my-exchange",
-    RoutingKey:   "my.routing.key",
-    Encoder:      encoders.JSON{},
-    DeliveryMode: amqp.Persistent,
-    MessageTTL:   30 * time.Second,
-})
-```
-
-## Subscriber (одна очередь)
-
-Логика retry через заголовок `x-death` (сохраняется после перезапуска процесса):
-
-| Условие | Действие |
-|---------|----------|
-| ошибка + `x-death < MaxRetries` | публикация в `RetryQueueName` + Ack |
-| ошибка + `x-death >= MaxRetries` | `Nack(requeue=false)` → DLQ через `x-dead-letter-*` binding |
-| ошибка публикации в retry | fallback `Nack(requeue=true)` |
-
-**Важно:** возвращаемый `bool` из обработчика **игнорируется** — retry всегда через DLX по заголовку x-death.
+## 2. Publisher: предпочитай `NewPublisher2`
 
 ```go
-sub := rabbitmq.NewSubscriber(dialer, "my-queue", rabbitmq.SubscriberOptions{
+pub := rabbitmq.NewPublisher2(rabbitmq.PublisherConfig{
+    Exchange:          "my-exchange",
+    RoutingKey:        "my.routing.key",
+    Encoder:           encoders.JSON{},
+    DeliveryMode:      amqp.Persistent,
+    PublisherConfirms: 10,
+}, dialer)
+```
+
+`NewPublisher` оставлен для обратной совместимости, но не как основной путь.
+
+### Publisher confirms
+
+Используй `PublisherConfirms`, когда цена потери сообщения высока.
+
+| Режим | Когда использовать |
+|---|---|
+| `0` | максимум throughput, fire-and-forget |
+| `1` | подтверждение на каждое сообщение |
+| `N` | батчевое подтверждение |
+
+## 3. Subscriber: предпочитай `NewSubscriber2`
+
+```go
+sub := rabbitmq.NewSubscriber2(rabbitmq.SubscriberConfig{
+    QueueName:      "my-queue",
     MaxRetries:     3,
-    RetryQueueName: "my-queue.retry", // по умолчанию: queueName+".retry"
+    RetryQueueName: "my-queue.retry",
     PrefetchCount:  1,
-    MessageTimeout: 30 * time.Second, // 0 = без таймаута
-})
+    MessageTimeout: 30 * time.Second,
+}, dialer)
 defer sub.Close()
-go sub.Listen(ctx, handler) // блокирует до отмены ctx или sub.Close()
 ```
 
-## MultiQueueSubscriber (несколько очередей, один канал)
+Дефолты, которые нужно помнить:
+- `RetryQueueName == ""` → обычно используется `QueueName + ".retry"`
+- `PrefetchCount == 0` → адаптер подставляет безопасный дефолт, но для читаемого контракта лучше указывать явно
+- `MessageTimeout == 0` → сообщение обрабатывается без per-message timeout
 
-- Один канал с `Qos(N, global=true)` — ограничение prefetch по всем потребителям
-- Один горутин-обработчик (паттерн fan-in)
-- Подходит для CPU/IO-тяжёлых нагрузок где параллелизм нежелателен
+### Retry semantics
+
+Retry строится через RabbitMQ DLX-механику и `x-death`.
+
+Логика:
+- ошибка + `x-death < MaxRetries` → публикация в retry queue
+- ошибка + `x-death >= MaxRetries` → `Nack(requeue=false)` и уход в DLQ
+- ошибка публикации в retry → fallback `Nack(requeue=true)`
+
+Важно:
+- `handler` возвращает `(bool, error)`, но `bool` здесь не участвует в retry-логике
+- retry определяется только фактом ошибки и состоянием `x-death`
+
+## 4. MultiQueueSubscriber
+
+Используй `MultiQueueSubscriber`, когда:
+- нужно читать несколько очередей
+- хочется один канал и один последовательный обработчик
+- нежелателен параллелизм между очередями
 
 ```go
 sub := rabbitmq.NewMultiQueueSubscriber(dialer, rabbitmq.MultiQueueOptions{
     PrefetchCount: 10,
     MaxRetries:    3,
 })
-defer sub.Close()
-go sub.Listen(ctx, // блокирует до отмены ctx или sub.Close()
-    rabbitmq.QueueHandler{QueueName: "queue-1", Handler: h1},
-    rabbitmq.QueueHandler{QueueName: "queue-2", Handler: h2},
-)
 ```
 
-См. `queue/rabbitmq/README.md` для полного примера DLX топологии.
+Важная деталь: `MultiQueueSubscriber` использует один канал и общий `Qos(..., global=true)` для fan-in обработки нескольких очередей.
+
+## 5. Практические детали
+
+- для durable/persistent очередей фиксируй hostname у RabbitMQ node
+- topology и retry queue должны быть созданы до старта subscriber
+- в интеграционных тестах topology удобнее применять напрямую через `Definitions`
+- recovery соединения не заменяет проверку topology: после reconnect убедись, что exchange/queue/bindings всё ещё соответствуют ожидаемому контракту
+
+Для коротких topology-паттернов см. `references/topology-patterns.md`.
+
+## Не делай
+
+- не используй устаревшие `NewPublisher` / `NewSubscriber` как основной выбор
+- не рассчитывай на `bool` из handler как на источник retry-поведения
+- не запускай subscriber без подготовленной DLX/retry topology, если рассчитываешь на retry

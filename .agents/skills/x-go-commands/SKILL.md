@@ -1,57 +1,13 @@
 ---
 name: "x-go-commands"
-description: "Справочник команд: запуск тестов, сборка, управление зависимостями Go-модуля"
+description: "Краткий appendix по выбору raw Go-команды: минимальный scope сначала, затем эскалация; если в репозитории есть Taskfile, предпочитай его"
 ---
-# Go Commands
 
-## Тестирование
-```bash
-# Запустить все тесты
-go test .
+# Go-команды
 
-# Пропустить интеграционные тесты (Docker)
-go test -short .
+Этот skill больше не считается owner-skill.
 
-# Тесты конкретного пакета
-go test ./db/pg/sqlx
-go test ./queue/rabbitmq
-go test ./queue/kafka
-
-# Подробный вывод
-go test -v ./...
-
-# Запустить один тест
-go test -run TestFunctionName ./path/to/pkg
-```
-
-## Сборка
-```bash
-# Собрать модуль
-go build ./...
-
-# Проверить зависимости
-go mod tidy
-go mod verify
-```
-
-## Зависимости
-```bash
-# Скачать зависимости
-go mod download
-
-# Обновить зависимости
-go get -u ./...
-```
-
-## Docker для интеграционных тестов
-Интеграционные тесты используют `github.com/testcontainers/testcontainers-go`.
-
-**Docker должен быть запущен** для прохождения интеграционных тестов:
-```bash
-docker ps  # проверить что Docker работает
-```
-
-Флаг `-short` пропускает интеграционные тесты (для CI/CD без Docker):
-```bash
-go test -short ./...
-```
+Оставшиеся project-specific reminders:
+- если в репозитории есть `Taskfile` или project wrapper, предпочитай его raw `go` командам
+- начинай с минимального scope и эскалируй только при необходимости
+- `-short` не используется для сокрытия падающих тестов

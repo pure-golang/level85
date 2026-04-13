@@ -1,172 +1,134 @@
 ---
 name: "x-database-patterns"
-description: "Паттерны работы с PostgreSQL: подключение, транзакции, named queries, выбор драйвера, слой репозитория"
-compatibility: git.korputeam.ru/newbackend/adapters
----
-# Паттерны работы с базой данных
-
-## Выбор драйвера
-
-| Адаптер | Драйвер | Когда использовать |
-|---------|---------|-------------------|
-| `db/pg/sqlx` | `lib/pq` | Существующие проекты, простые запросы |
-| `db/pg/pgx` | `jackc/pgx/v5` | Новые проекты, connection pooling, высокая нагрузка |
-
-**pgx рекомендуется для новых проектов.**
-
+description: "Применяй когда проектируешь PostgreSQL-доступ в сервисе или адаптере: выбор `pgx`/`sqlx`, структура `repo`, общий `dbQuerier`, транзакции, named queries и обработка constraint errors"
+compatibility: ../adapters
 ---
 
-## Слой репозитория: плоская структура
+# PostgreSQL-паттерны
 
-Все репозитории сервиса — в одном пакете `repo`, каждый в своём файле по имени сущности.
-Вложенные подпакеты (`repo/room/`, `repo/participant/`) **запрещены**: они не позволяют передать одну `tx` сразу в несколько репозиториев.
+## Когда применять
 
-```
+Используй этот скилл, когда:
+- выбираешь между `db/pg/pgx` и `db/pg/sqlx`
+- проектируешь слой `repo`
+- реализуешь транзакцию через несколько репозиториев
+- обрабатываешь PostgreSQL constraint errors
+
+Не применяй для:
+- доменной логики без SQL
+- разовых ad-hoc запросов в handler/service без отдельного репозитория
+
+## 1. Сначала выбери драйвер
+
+| Вариант | Когда брать |
+|---|---|
+| `db/pg/pgx` | новый проект, нативный pgx, pool, высокая нагрузка |
+| `db/pg/sqlx` | нужен `database/sql`-совместимый стек, named queries, уже есть код на sqlx |
+
+Для новых проектов по умолчанию выбирай `pgx`.
+
+Не используй `JSONB` как основной способ моделирования прикладных данных. Если данные участвуют в поиске, фильтрации, join или constraint logic, проектируй отдельные таблицы и явную схему.
+
+## 2. Спроектируй слой `repo`
+
+В service-репозиториях ориентируйся на плоский паттерн: один пакет `repo`, несколько файлов по сущностям, общий `dbQuerier`.
+
+Для naming conventions, транзакционных caveats, query timeout и более полных sqlx-примеров см. `references/repo-patterns.md`.
+
+```text
 internal/
   repo/
-    db.go            ← dbQuerier интерфейс, общие ошибки
-    room.go          ← RoomRepo
-    participant.go   ← ParticipantRepo
+    db.go
+    room.go
+    participant.go
 ```
 
-### db.go — общий интерфейс (pgx)
+Общий контракт:
 
 ```go
-// dbQuerier реализуется как пулом (*pgxpool.Pool), так и транзакцией (pgx.Tx).
 type dbQuerier interface {
     Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
-    Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
+    Exec(ctx context.Context, sql string, args ...any) (pgconn.CommandTag, error)
 }
 ```
 
-### Структура репозитория
+Такой интерфейс должен принимать и pool, и transaction.
+
+Если репозиторий в сервисе один, допустим и более компактный вариант с одним основным `repo`-типом и общим `db`.
+
+## 3. Конструктор репозитория
 
 ```go
-type RoomRepo struct{ db dbQuerier }
-
-func NewRoom(db dbQuerier) *RoomRepo { return &RoomRepo{db: db} }
-```
-
-### Именование
-
-| Что | Пример |
-|-----|--------|
-| Файл | `room.go` |
-| Структура | `RoomRepo` |
-| Конструктор | `NewRoom(db dbQuerier) *RoomRepo` |
-| Tracer | `var roomTracer = otel.Tracer("…/repo/room")` |
-| Ошибки пакета | `db.go` → `errDBNotConfigured` |
-| Ошибки репозитория | тот же файл → `errRoomNotFound` |
-
----
-
-## Подключение (sqlx)
-
-```go
-cfg := sqlx.Config{
-    Host:           "localhost",
-    Port:           5432,
-    User:           "postgres",
-    Password:       "secret",
-    Database:       "mydb",
-    SSLMode:        "disable",
-    ConnectTimeout: 5,
-    QueryTimeout:   10 * time.Second,
+type RoomRepo struct {
+    db dbQuerier
 }
 
-db, err := sqlx.Connect(context.Background(), cfg)
-defer db.Close()
+func NewRoom(db dbQuerier) *RoomRepo {
+    return &RoomRepo{db: db}
+}
 ```
 
----
+Конструктор:
+- возвращает одно значение
+- не делает I/O
+- просто сохраняет зависимость
 
-## Транзакции
+## 4. Транзакции
 
-### Кросс-репо транзакция (pgx)
+### `pgx`
+
+Для кросс-репо операций создавай `tx` снаружи и передавай его в новые экземпляры репозиториев:
 
 ```go
 return pool.BeginTxFunc(ctx, pgx.TxOptions{}, func(tx pgx.Tx) error {
     roomRepo := repo.NewRoom(tx)
     participantRepo := repo.NewParticipant(tx)
-
-    if err := roomRepo.Create(ctx, room); err != nil {
-        return err
-    }
-    return participantRepo.Create(ctx, participant)
+    // ...
+    return nil
 })
 ```
 
-### RunTx (sqlx)
+### `sqlx`
+
+Используй `RunTx` из адаптера:
 
 ```go
 err := db.RunTx(ctx, nil, func(ctx context.Context, tx *sqlx.Tx) error {
-    _, err := tx.Exec(ctx, "UPDATE accounts SET balance = balance - $1 WHERE id = $2", 100, 1)
-    if err != nil {
-        return err  // автоматический откат при ошибке
-    }
-    _, err = tx.Exec(ctx, "UPDATE accounts SET balance = balance + $1 WHERE id = $2", 100, 2)
-    return err  // коммит при nil, откат при ошибке
-})
-```
-
-### Уровни изоляции (sqlx)
-
-```go
-opts := &sqlx.TxOptions{
-    Isolation: sql.LevelRepeatableRead,
-    ReadOnly:  false,
-}
-err := db.RunTx(ctx, opts, func(ctx context.Context, tx *sqlx.Tx) error {
     // операции
     return nil
 })
 ```
 
-**Заметки:**
-- `RunTx()` автоматически откатывает транзакцию при ошибке или панике.
-- Ручной `Rollback()` должен проверять `sql.ErrTxDone` (уже закоммичено/откачено).
+`RunTx` должен автоматически откатывать транзакцию при error и panic.
 
----
+## 5. Обрабатывай constraint errors через хелперы
 
-## Named Queries (sqlx)
+Для `sqlx`-адаптера используй:
 
 ```go
-type User struct {
-    ID   int    `db:"id"`
-    Name string `db:"name"`
-    Age  int    `db:"age"`
-}
+sqlx.IsUniqueViolation(err)
+sqlx.IsForeignKeyViolation(err)
+sqlx.IsCheckViolation(err)
+sqlx.IsNotNullViolation(err)
+sqlx.IsConstraintViolation(err)
+```
 
-user := User{Name: "John", Age: 30}
-result, err := db.NamedExec(ctx,
+## 6. Query timeout и named queries — только там, где они действительно упрощают код
+
+Если в адаптере есть конфигурируемый `QueryTimeout`, оборачивай каждую операцию в `context.WithTimeout`, а не размазывай таймауты по вызывающему коду.
+
+Если структура данных хорошо ложится на именованные параметры, `sqlx` может быть проще:
+
+```go
+_, err := db.NamedExec(ctx,
     "INSERT INTO users (name, age) VALUES (:name, :age)",
-    user)
+    user,
+)
 ```
 
----
+## Не делай
 
-## Проверка нарушений ограничений
-
-```go
-// Проверки ограничений PostgreSQL.
-IsUniqueViolation(err)
-IsForeignKeyViolation(err)
-IsCheckViolation(err)
-IsNotNullViolation(err)
-IsConstraintViolation(err)
-```
-
----
-
-## Таймаут запросов
-
-- Применяется через обёртку контекста (`WithTimeout()`).
-- Дефолтный таймаут задаётся в `Config.QueryTimeout`.
-- SQL-запросы автоматически получают таймаут через обёртку.
-
----
-
-## Ограничения
-
-- Запрещено использовать поля JSONB — они очень медленные.
-- Вложенные подпакеты в `repo/` запрещены — ломают передачу `tx`.
+- не используй `JSONB` как замену нормальной схеме хранения
+- не дроби service-репозитории на вложенные `repo/foo`, `repo/bar`, если им нужна общая транзакция
+- не создавай репозиторий, который знает о конкретном pool и не принимает `tx`
+- не размазывай SQL-доступ по service-слою
