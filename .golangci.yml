@@ -92,6 +92,10 @@ linters:
         linters:
           - revive
         text: "filename-format"
+      - path: test/bdd/steps/\d+_.*_test\.go
+        linters:
+          - revive
+        text: "filename-format"
       # # Config-структуры намеренно передаются по значению для изоляции и безопасности nil
       # - source: "\\bConfig\\b"
       #   linters:

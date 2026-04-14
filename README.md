@@ -66,6 +66,10 @@ includes:
       }
     }
   },
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "language": "russian",
   "effortLevel": "medium",
   "voiceEnabled": false,
