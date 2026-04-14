@@ -1,5 +1,9 @@
 version: "3"
 
+env:
+  # Подавляет warnings для MacOS
+  CGO_LDFLAGS: "-O2 -g -Wl,-w"
+
 tasks:
   default:
     # Эта задача выполняется по умолчанию при вызове 'task' без аргументов.
