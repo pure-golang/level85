@@ -16,8 +16,6 @@ compatibility: ../adapters
 
 ## Workflow
 
-Для сводки по текущим API-дефолтам и compatibility caveats см. `references/publisher-subscriber-patterns.md`.
-
 ### 1. Создай `Dialer`
 
 ```go
@@ -41,10 +39,18 @@ pub := kafka.NewPublisher(dialer, kafka.PublisherConfig{
 })
 ```
 
+Текущие дефолты из `../adapters/queue/kafka/publisher.go`:
+
+- `Encoder == nil` → `encoders.JSON{}`
+- `Balancer == nil` → `&kafka.LeastBytes{}`
+
 `Balancer` выбирай осознанно:
 - `LeastBytes` — безопасный дефолт
 - `Hash` — если важна стабильная партиция по ключу
 - `RoundRobin` — равномерное распределение
+
+Важно: всегда заполняй `queue.Message.Topic`.
+В текущем адаптере есть compatibility fallback для пустого topic, но это не тот контракт, на который нужно опираться.
 
 ### 3. Создай `Subscriber`
 
@@ -57,6 +63,13 @@ sub := kafka.NewSubscriber(dialer, "my-topic", kafka.SubscriberConfig{
 })
 defer sub.Close()
 ```
+
+Текущие дефолты из `../adapters/queue/kafka/subscriber.go`:
+
+- `Name == ""` → случайный UUID
+- `PrefetchCount <= 0` → `1`
+- `MaxTryNum == 0` → `3`
+- `Backoff == 0` → `5s`
 
 ### 4. Реализуй handler по контракту `(bool, error)`
 
@@ -74,7 +87,7 @@ go sub.Listen(ctx, func(ctx context.Context, msg queue.Delivery) (bool, error) {
 - `true, err` — повторять до `MaxTryNum`
 - `false, err` — зафиксировать ошибку без retry
 
-Если `MaxTryNum < 0`, адаптер уходит в бесконечный retry через рестарт consumer session.
+Если `MaxTryNum < 0`, адаптер уходит в бесконечный retry через рестарт consumer session. Используй это только для идемпотентных операций с понятным monitoring.
 
 ## Практические правила
 
@@ -89,7 +102,3 @@ go sub.Listen(ctx, func(ctx context.Context, msg queue.Delivery) (bool, error) {
 - не игнорируй выбор `GroupID`: он определяет распределение нагрузки между consumer'ами
 - не рассчитывай на пустой `Topic` в publisher как на нормальный контракт
 - не используй бесконечный retry (`MaxTryNum < 0`) без понятной стратегии идемпотентности и мониторинга
-
-## Полезные ресурсы
-
-- `references/publisher-subscriber-patterns.md` — сводка дефолтов `Publisher`/`Subscriber` и compatibility caveats текущего Kafka adapter API

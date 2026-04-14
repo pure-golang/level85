@@ -58,7 +58,7 @@ tasks:
     cmds:
       - go test -bench=. -run=^$ ./test/
 
-  bench:mem:
+  bench-mem:
     desc: "Run all benchmarks with memory profiling"
     cmds:
       - go test -bench=. -run=^$ -benchmem ./test/
@@ -68,17 +68,17 @@ tasks:
     cmds:
       - go test -race -failfast -count=1 ./...
 
-  test:v:
+  test-v:
     desc: "Run all tests with verbose output"
     cmds:
       - go test -v -race -failfast -count=1 ./...
 
-  test:short:
+  test-short:
     desc: "Run short tests"
     cmds:
       - go test -v -race -short -failfast -count=1 ./...
 
-  test:smoke:
+  test-smoke:
     desc: "Run smoke tests"
     cmds:
       - go test -tags smoke -v -race -failfast -count=1 ./test/smoke/
@@ -99,7 +99,7 @@ tasks:
       - '[ "$(readlink .agents)" = "../level85/.agents" ] || ln -sf ../level85/.agents .agents'
       - ln -sf ../level85/AGENTS.md AGENTS.md
 
-  agents:claude:
+  agents-claude:
     desc: "Setup Agents for Claude"
     deps: [agents]
     cmds:
@@ -110,6 +110,6 @@ tasks:
     desc: "Run all BDD scenarios"
     cmd: go test ./test/bdd/steps/...
 
-  bdd:pending:
+  bdd-pending:
     desc: "Show pending (unimplemented) steps"
     cmd: go test ./test/bdd/steps/ -godog.format=pretty 2>&1 | grep -i pending

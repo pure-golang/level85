@@ -48,7 +48,29 @@ type pointRepo interface {
 
 ## Конфиг mockery v3
 
-Корневой `.mockery.yml` — источник правды для генерации. Типовой шаблон конфига и package scoping вынесены в `references/mockery-config-patterns.md`.
+Корневой `.mockery.yml` — источник правды для генерации.
+
+Базовый паттерн с областью пакета:
+
+```yaml
+filename: "{{.InterfaceName | snakecase}}.go"
+dir: "{{.InterfaceDir}}/mocks"
+structname: "{{.InterfaceName | firstUpper}}"
+pkgname: mocks
+template: testify
+template-data:
+  unroll-variadic: true
+packages:
+  your/module/internal/service:
+    config:
+      all: true
+```
+
+Это проектный дефолт:
+
+- сгенерированный файл лежит рядом с пакетом интерфейса в `mocks/`
+- конструктор создаётся как `New<Type>(t)`
+- `EXPECT()` даётся шаблоном `testify`
 
 Правила:
 - следуй имени конфиг-файла, принятому в проекте; в текущем паттерне используется `.mockery.yml`
@@ -58,6 +80,11 @@ type pointRepo interface {
 - если пакет уже указан с `all: true`, новый интерфейс подхватится автоматически
 - если интерфейс добавлен в новый пакет, сначала добавь этот пакет в `.mockery.yml`
 - не смешивай этот подход с точечными CLI-флагами на отдельных интерфейсах: источник правды должен оставаться в `.mockery.yml`
+
+### Когда добавлять пакет в `.mockery.yml`
+
+Если интерфейс появился в новом пакете, сначала добавь пакет в `packages:`.
+Если пакет уже указан с `all: true`, отдельный интерфейс туда дописывать не нужно.
 
 ## Генерация
 
@@ -139,6 +166,8 @@ repo.EXPECT().
 - имя файла в `snake_case`, имя структуры в `PascalCase`
 - конструктор `New<Type>(t)` и метод `EXPECT()` сгенерировались
 - тесты компилируются без ручных правок сгенерированного файла
+- пакет присутствует в `.mockery.yml`
+- сгенерированный файл не редактируется вручную
 
 ## Не делай
 
@@ -146,8 +175,9 @@ repo.EXPECT().
 - не используй `.Once()` для одиночного вызова
 - не редактируй сгенерированные `mocks/*.go` вручную
 - не держи параллельно несколько источников правды для генерации (`.mockery.yml` и точечные `//go:generate`)
+- не пиши inline mock-структуры в тестах, если интерфейс есть в `.mockery.yml`; всегда используй `mocks.NewX(t)` + `EXPECT()` — inline-моки обходят auto-cleanup и создают неконсистентность
+- не используй `.On("Method", ...)` напрямую; используй `.EXPECT().Method(...)` — это type-safe API, проектный стандарт
 
 ## Полезные ресурсы
 
-- `references/mockery-config-patterns.md` — варианты `.mockery.yml`, package scoping и post-check паттерны
 - `scripts/check-mockery-targets.sh` — проверка `.mockery.yml`, `mocks/*.go`, `EXPECT()` и `New<Type>(t)` после генерации

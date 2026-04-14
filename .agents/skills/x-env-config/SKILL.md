@@ -44,6 +44,23 @@ type Config struct {
 - секреты не делай `required:"true"` автоматически: сначала проверь, существует ли безопасный noop/local режим
 - длительности задавай строкой (`"5s"`, `"1m"`)
 
+#### Корневой `Config` с вложенными adapter/platform-конфигами
+
+```go
+type Config struct {
+    Environment string        `envconfig:"ENVIRONMENT" default:"development"`
+    Monitoring  monitoring.Config
+    HTTPServer  ahttp.Config
+    GRPCServer  agrpc.Config
+    Database    apgx.Config
+}
+```
+
+Правило:
+
+- корневой `Config` собирает настройки приложения верхнего уровня
+- вложенные зависимости остаются вложенными типами, не расплющивай их вручную без причины
+
 ### 2. Загрузи конфиг через `env.InitConfig`
 
 ```go
@@ -70,10 +87,29 @@ REDIS_TIMEOUT=10s
 ### 4. Задокументируй переменные
 
 Все поля `Config` перечисляй в секции `Конфигурация:` файла `doc.go`.
-Для деталей по корневому `Config`, вложенным конфигам и policy для `doc.go` см. `references/config-doc-patterns.md`.
 Для формата комментария пакета см. `x-doc-go`.
 
 Если корневой `Config` содержит вложенные adapter/platform-конфиги, перечисли верхнеуровневые переменные явно и укажи, где смотреть остальные.
+
+#### `doc.go` не обязан дублировать вообще всё
+
+- верхнеуровневые переменные перечислены явно
+- для остальных есть ссылка на вложенные конфиги `monitoring`, `logger`, `metrics`, `tracing`
+
+Это хороший баланс между полнотой и шумом.
+
+#### Когда полезен полный список env
+
+- если пакет сам владеет большим числом прикладных переменных
+- если эти переменные действительно важны как контракт пакета
+
+Тогда допустим длинный перечислительный `doc.go`.
+
+#### Legacy-совместимость
+
+- можно явно документировать legacy env migration
+- нужно указать, какие новые переменные имеют приоритет
+- это часть контракта, если приложение реально поддерживает legacy aliases
 
 ### 5. Проверь edge cases
 
@@ -85,7 +121,13 @@ REDIS_TIMEOUT=10s
 - поведение теста с `.env` и `os.Chdir()` без параллельного запуска, если проверяешь загрузку из cwd
 
 Если тест на конфиг меняет env процесса или рабочую директорию, это уже process-wide state.
-Не ускоряй такой тест через `t.Parallel()`: сначала обеспечь cleanup, а для общих правил см. `x-testing-conventions` и `references/parallel-safety.md`.
+Не ускоряй такой тест через `t.Parallel()`: сначала обеспечь cleanup, а для общих правил см. `x-testing-conventions`.
+
+#### Unit-тесты конфигурации
+
+- app/runtime код загружает конфиг через `env.InitConfig`
+- unit-тесты часто проверяют `envconfig.Process("", &cfg)` напрямую
+- отдельные правила по `t.Setenv`, `t.Parallel()` и AAA лежат в `x-testing-conventions`
 
 ## Не делай
 
@@ -96,5 +138,4 @@ REDIS_TIMEOUT=10s
 
 ## Полезные ресурсы
 
-- `references/config-doc-patterns.md` — паттерны для корневого `Config`, вложенных конфигов, `doc.go` и legacy env migration
 - `scripts/check-env-config.py` — проверка согласованности `envconfig` тегов, `doc.go` и `.env`

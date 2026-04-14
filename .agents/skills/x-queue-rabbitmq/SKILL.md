@@ -27,6 +27,33 @@ compatibility: ../adapters
 - JSON-файла через `definitions.JSON()` под management API / `load_definitions`
 - прямого применения topology в тестах
 
+### Базовый retry/DLQ паттерн
+
+Нужны:
+- основная очередь
+- retry очередь с `x-message-ttl`
+- DLQ
+- binding'и и, при необходимости, отдельный DLX exchange
+
+Идея:
+- обработчик падает
+- subscriber публикует сообщение в retry queue
+- по TTL RabbitMQ возвращает его в основную очередь
+- после исчерпания `MaxRetries` сообщение уходит в DLQ
+
+### `Definitions` как JSON
+
+`Definitions` полезны не только для тестов, но и как переносимый topology artifact:
+
+```go
+payload, err := definitions.JSON()
+```
+
+Дальше этот JSON можно:
+- загрузить через management API
+- использовать через `load_definitions`
+- импортировать через `rabbitmqctl import_definitions`
+
 ## 2. Publisher: предпочитай `NewPublisher2`
 
 ```go
@@ -82,6 +109,13 @@ Retry строится через RabbitMQ DLX-механику и `x-death`.
 - `handler` возвращает `(bool, error)`, но `bool` здесь не участвует в retry-логике
 - retry определяется только фактом ошибки и состоянием `x-death`
 
+### Что проверить до запуска subscriber
+
+- существует ли `RetryQueueName`
+- есть ли route обратно в основную очередь
+- настроен ли DLQ path
+- совпадает ли `RoutingKey` publisher с topology
+
 ## 4. MultiQueueSubscriber
 
 Используй `MultiQueueSubscriber`, когда:
@@ -98,6 +132,8 @@ sub := rabbitmq.NewMultiQueueSubscriber(dialer, rabbitmq.MultiQueueOptions{
 
 Важная деталь: `MultiQueueSubscriber` использует один канал и общий `Qos(..., global=true)` для fan-in обработки нескольких очередей.
 
+Не брать его по инерции, если обработка может идти независимо и параллельно.
+
 ## 5. Практические детали
 
 - для durable/persistent очередей фиксируй hostname у RabbitMQ node
@@ -105,7 +141,21 @@ sub := rabbitmq.NewMultiQueueSubscriber(dialer, rabbitmq.MultiQueueOptions{
 - в интеграционных тестах topology удобнее применять напрямую через `Definitions`
 - recovery соединения не заменяет проверку topology: после reconnect убедись, что exchange/queue/bindings всё ещё соответствуют ожидаемому контракту
 
-Для коротких topology-паттернов см. `references/topology-patterns.md`.
+### Hostname caveat для durable node
+
+Для persistent RabbitMQ node hostname должен быть стабильным: имя узла выглядит как `rabbit@<hostname>`. Если hostname меняется между перезапусками контейнера, ожидания по сохранённому состоянию и recovery могут не совпасть с фактическим поведением.
+
+Минимальный ориентир для compose:
+
+```yaml
+services:
+  rabbitmq:
+    hostname: rabbitmq
+```
+
+### Recovery behaviour
+
+Recovery соединения полезен, но не отменяет явную проверку topology и retry path после reconnect. Если topology drift недопустим, проверяй его отдельно, а не считай reconnect достаточной гарантией.
 
 ## Не делай
 

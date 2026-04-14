@@ -33,7 +33,13 @@ compatibility: ../adapters
 
 В service-репозиториях ориентируйся на плоский паттерн: один пакет `repo`, несколько файлов по сущностям, общий `dbQuerier`.
 
-Для naming conventions, транзакционных caveats, query timeout и более полных sqlx-примеров см. `references/repo-patterns.md`.
+Эталонный паттерн:
+- один пакет `repo`
+- один файл на сущность
+- общий `dbQuerier`
+- конструкторы без I/O
+
+Если нескольким репозиториям нужна одна транзакция, вложенные подпакеты `repo/foo`, `repo/bar` для сервисного слоя не используй.
 
 ```text
 internal/
@@ -55,6 +61,25 @@ type dbQuerier interface {
 Такой интерфейс должен принимать и pool, и transaction.
 
 Если репозиторий в сервисе один, допустим и более компактный вариант с одним основным `repo`-типом и общим `db`.
+
+### Naming conventions
+
+| Что | Паттерн |
+|---|---|
+| файл сущности | `room.go` |
+| общий файл контракта | `db.go` или `errors.go` |
+| структура репозитория | `RoomRepo` или компактный `repo` |
+| конструктор | `NewRoom(db dbQuerier)` |
+| tracer | `var roomTracer = otel.Tracer(".../repo/room")` |
+| ошибка пакета | `errDBNotConfigured` |
+| ошибка сущности | `errRoomNotFound` |
+
+### Когда допустим один репозиторий на пакет
+
+Если сервис маленький и пакет фактически реализует один адаптер хранения, допустим более компактный вариант:
+- один пакет
+- один основной тип репозитория
+- общий адаптер извне
 
 ## 3. Конструктор репозитория
 
@@ -101,6 +126,22 @@ err := db.RunTx(ctx, nil, func(ctx context.Context, tx *sqlx.Tx) error {
 
 `RunTx` должен автоматически откатывать транзакцию при error и panic.
 
+Если несколько репозиториев участвуют в одной операции, они должны принимать одну и ту же транзакционную зависимость, а не открывать соединения сами.
+
+Если пишешь ручной `Rollback`, проверяй `sql.ErrTxDone`, чтобы не считать уже завершённую транзакцию новой ошибкой.
+
+Пример с isolation level:
+
+```go
+opts := &sqlx.TxOptions{
+    Isolation: sql.LevelRepeatableRead,
+}
+
+err := db.RunTx(ctx, opts, func(ctx context.Context, tx *sqlx.Tx) error {
+    return nil
+})
+```
+
 ## 5. Обрабатывай constraint errors через хелперы
 
 Для `sqlx`-адаптера используй:
@@ -113,17 +154,52 @@ sqlx.IsNotNullViolation(err)
 sqlx.IsConstraintViolation(err)
 ```
 
+Если нужно проверить обобщённый случай, используй `sqlx.IsConstraintViolation(err)` как верхнеуровневый helper поверх более узких проверок.
+
 ## 6. Query timeout и named queries — только там, где они действительно упрощают код
 
 Если в адаптере есть конфигурируемый `QueryTimeout`, оборачивай каждую операцию в `context.WithTimeout`, а не размазывай таймауты по вызывающему коду.
 
+Если у адаптера есть `Config.QueryTimeout`, оборачивай запросы в локальный `context.WithTimeout`:
+
+```go
+func WithTimeout(ctx context.Context, timeout time.Duration) (context.Context, context.CancelFunc) {
+    if timeout <= 0 {
+        return ctx, func() {}
+    }
+    return context.WithTimeout(ctx, timeout)
+}
+```
+
+Таймаут должен жить рядом с SQL-адаптером, а не размазываться по service-коду.
+
 Если структура данных хорошо ложится на именованные параметры, `sqlx` может быть проще:
 
 ```go
+type User struct {
+    Name string `db:"name"`
+    Age  int    `db:"age"`
+}
+
 _, err := db.NamedExec(ctx,
     "INSERT INTO users (name, age) VALUES (:name, :age)",
-    user,
+    User{Name: "John", Age: 30},
 )
+```
+
+### `sqlx.Connect()` стартовый пример
+
+```go
+cfg := sqlx.Config{
+    Host:           "localhost",
+    Port:           5432,
+    User:           "postgres",
+    Password:       "secret",
+    Database:       "app",
+    SSLMode:        "disable",
+    ConnectTimeout: 5 * time.Second,
+    QueryTimeout:   10 * time.Second,
+}
 ```
 
 ## Не делай

@@ -6,7 +6,7 @@ compatibility: ../adapters
 
 # Новый адаптер
 
-Этот skill — orchestration-skill для нового adapter package. Он собирает workflow и указывает на owner-skills, а не пересказывает их.
+Этот skill собирает workflow создания нового adapter package и ссылается на смежные skills, а не пересказывает их.
 
 ## Когда применять
 
@@ -34,7 +34,7 @@ compatibility: ../adapters
 - конструктор без I/O
 - явные `Start()/Connect()/Run()/Close()`, если lifecycle нужен
 
-### 4. Подключи observability только через owner-skills
+### 4. Подключи observability
 
 - logging policy → `x-log`
 - tracing/metrics/bootstrap → `x-observability`
