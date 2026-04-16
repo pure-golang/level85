@@ -81,6 +81,7 @@
 | consumer-side mocks | `x-mockery` |
 | test matrix document | `x-test-matrix` |
 | первичная диагностика test/env/service | `x-troubleshooting` |
+| TDLib-адаптер, `clientAdapter`, тестовая стратегия Telegram | `x-tdlib` |
 
 Если у правила уже есть владелец, в остальных местах оставляй только короткую ссылку, а не пересказ.
 
