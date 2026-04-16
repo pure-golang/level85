@@ -69,23 +69,33 @@ Span name: `packageName.Operation`, например `sqlx.Get`, `S3.Put`, `rabb
 - исключения для health/metrics paths принимай осознанно, а не по инерции
 - `/graphql` не исключай, если GraphQL observability должна строиться как child span от HTTP span
 - если операция внутри handler сама владеет внешним вызовом, дочерний span именуй как `packageName.Operation`
+- `Monitoring` — whitelist путей; без аргументов мониторинг не применяется ни к одному запросу
+
+Минимальная цепочка (GraphQL + REST):
+
+```go
+handler := amiddleware.Chain(
+    mux,
+    amiddleware.Monitoring("/graphql", "/api/*"),
+    amiddleware.Recovery,
+)
+```
 
 ##### gRPC
 
-- если используешь готовый bootstrap, держись `SetupMonitoring`
-- если собираешь цепочку вручную, держи порядок `recovery -> tracing -> logging -> metrics`
-- recovery, tracing, metrics и logging должны работать как согласованный стек, а не как набор случайных interceptors
+- используй `SetupMonitoring` из `adapters/grpc/middleware` или при ручной сборке держи порядок `tracing -> metrics -> recovery -> logging`
+- observability (tracing/metrics) снаружи recovery — чтобы видеть ошибки от паник
 - если добавляешь свой interceptor, проверь, не ломает ли он propagation `context` и span attributes
 
-Минимальная ручная цепочка:
+Минимальная цепочка:
 
 ```go
 grpc.NewServer(
     grpc.ChainUnaryInterceptor(
-        recovery.UnaryServerInterceptor(),
         tracing.UnaryServerInterceptor(),
-        logging.UnaryServerInterceptor(),
         metrics.UnaryServerInterceptor(),
+        recovery.UnaryServerInterceptor(),
+        logging.UnaryServerInterceptor(),
     ),
 )
 ```
