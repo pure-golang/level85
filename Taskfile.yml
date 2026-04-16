@@ -2,7 +2,7 @@ version: "3"
 
 env:
   # Подавляет warnings для MacOS
-  CGO_LDFLAGS: "-O2 -g -Wl,-w"
+  CGO_LDFLAGS: "-O2 -g -Wl,-w -Wl,-no_warn_duplicate_libraries"
 
 tasks:
   default:
@@ -103,16 +103,17 @@ tasks:
   agents:
     desc: "Setup Agents"
     status:
-      - '[ "$(basename $PWD)" = "level85" ]'
+      - "[ \"$(basename $PWD)\" = \"level85\" ]"
     cmds:
-      - '[ "$(readlink .agents)" = "../level85/.agents" ] || ln -sf ../level85/.agents .agents'
+      - "[ \"$(readlink .agents)\" = \"../level85/.agents\" ] || ln -sf
+        ../level85/.agents .agents"
       - ln -sf ../level85/AGENTS.md AGENTS.md
 
   agents-claude:
     desc: "Setup Agents for Claude"
-    deps: [agents]
+    deps: [ agents ]
     cmds:
-      - '[ "$(readlink .claude)" = ".agents" ] || ln -sf .agents .claude'
+      - "[ \"$(readlink .claude)\" = \".agents\" ] || ln -sf .agents .claude"
       - echo '@AGENTS.md' > CLAUDE.md
 
   bdd:
@@ -121,4 +122,5 @@ tasks:
 
   bdd-pending:
     desc: "Show pending (unimplemented) steps"
-    cmd: go test -race -failfast -count=1 -p 8 ./test/bdd/steps/ -godog.format=pretty 2>&1 | grep -i pending
+    cmd: go test -race -failfast -count=1 -p 8 ./test/bdd/steps/
+      -godog.format=pretty 2>&1 | grep -i pending
