@@ -19,6 +19,9 @@
 - допустимые импорты leaf-пакета: `domain`, `dto`, `config`, собственные под-пакеты
 - service-пакеты зависят от leaf-пакетов только через интерфейсы, а не через конкретные реализации
 - единственная точка сборки графа зависимостей — `cmd/*/main.go`
+- горизонтальные импорты между sibling-модулями (`service/X → service/Y`, `repo/X → repo/Y`, `handler → handler`) запрещены; обмен идёт сверху вниз через конструктор или через общие пакеты
+- общие пакеты, которые разрешено импортировать всем: `internal/domain`, `internal/dto`, `internal/config`
+- типы из внешних библиотек (`github.com/...`) разрешено использовать как рабочий контракт напрямую — не дублируй их в `internal/domain/`; детали и ловушки — в `x-unit-test-partial-interface`
 
 ### Конструкторы и lifecycle
 
@@ -68,6 +71,7 @@
 | Тема | Канонический владелец |
 |---|---|
 | `doc.go`, package contract, doc comments | `x-doc-go` |
+| частично применяемые интерфейсы, типы в их сигнатурах, запрет дублировать domain внешних библиотек | `x-unit-test-partial-interface` |
 | test layers, `t.Parallel()`, `testing.Short()`, AAA, `t.Cleanup` | `x-testing-conventions` |
 | BDD layout и нумерация сценариев | `x-bdd-godog` |
 | продуктовый путь BDD (`PRD -> .feature`) | `x-bdd-product-workflow` |

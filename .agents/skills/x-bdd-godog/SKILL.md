@@ -200,8 +200,8 @@ func register01AuthSteps(ctx *godog.ScenarioContext, s *scenarioCtx) {
 go test ./test/bdd/steps/...
 go test ./test/bdd/steps/ -godog.name="^01[A-Z]?\."
 go test ./test/bdd/steps/ -godog.name="^02A\."
-task bdd:all
-task bdd:pending
+task bdd
+task bdd-pending
 ```
 
 ### 4. Держи границы ответственности

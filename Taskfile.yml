@@ -118,9 +118,9 @@ tasks:
 
   bdd:
     desc: "Run all BDD scenarios"
-    cmd: go test -race -failfast -count=1 -p 8 ./test/bdd/steps/...
+    cmd: go test -tags bdd -count=1 -p 8 ./test/bdd/steps/...
 
   bdd-pending:
     desc: "Show pending (unimplemented) steps"
-    cmd: go test -race -failfast -count=1 -p 8 ./test/bdd/steps/
+    cmd: go test -tags bdd -failfast -count=1 -p 8 ./test/bdd/steps/
       -godog.format=pretty 2>&1 | grep -i pending
