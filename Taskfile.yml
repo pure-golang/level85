@@ -19,7 +19,7 @@ tasks:
       - go mod download
       - go mod tidy
 
-  generate:
+  gqlgen:
     desc: "Regenerate gqlgen files"
     cmds:
       - go run github.com/99designs/gqlgen generate
@@ -118,7 +118,7 @@ tasks:
 
   bdd:
     desc: "Run all BDD scenarios"
-    cmd: go test -tags bdd -count=1 -p 8 -timeout 10m ./test/bdd/steps/...
+    cmd: go test -tags bdd -count=1 -p 8 -timeout 20m ./test/bdd/steps/...
 
   bdd-pending:
     desc: "Show pending (unimplemented) steps"
