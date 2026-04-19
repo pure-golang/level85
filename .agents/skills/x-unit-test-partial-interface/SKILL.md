@@ -144,10 +144,10 @@ func TestService_GetItem(t *testing.T) {
             // Arrange
             repo := mocks.NewItemRepo(t)
             tt.prepare(repo)
-            svc := New(repo)
+            service := New(repo)
 
             // Act
-            got, err := svc.MethodName(context.Background(), tt.id)
+            got, err := service.MethodName(context.Background(), tt.id)
 
             // Assert
             assert.ErrorIs(t, err, tt.wantErr)
@@ -199,10 +199,10 @@ func TestService_Create(t *testing.T) {
             t.Parallel()
 
             // Arrange
-            svc := tt.setup(t)
+            service := tt.setup(t)
 
             // Act
-            got, err := svc.Create(context.Background())
+            got, err := service.Create(context.Background())
 
             // Assert
             tt.verify(t, got, err)
@@ -217,12 +217,12 @@ func TestService_Create(t *testing.T) {
 type ServiceSuite struct {
     suite.Suite
     repo *mocks.ItemRepo
-    svc  *Service
+    service *Service
 }
 
 func (s *ServiceSuite) SetupTest() {
     s.repo = mocks.NewItemRepo(s.T())
-    s.svc = New(s.repo)
+    s.service = New(s.repo)
 }
 
 func (s *ServiceSuite) TestMethodName() {
@@ -232,7 +232,7 @@ func (s *ServiceSuite) TestMethodName() {
         Return(&entity.Item{ID: 1}, nil)
 
     // Act
-    got, err := s.svc.MethodName(context.Background(), 1)
+    got, err := s.service.MethodName(context.Background(), 1)
 
     // Assert
     s.Require().NoError(err)
@@ -257,10 +257,10 @@ func TestMethodName_error(t *testing.T) {
         GetItem(mock.Anything, mock.Anything).
         Return(nil, assert.AnError)
 
-    svc := New(repo)
+    service := New(repo)
 
     // Act
-    got, err := svc.MethodName(context.Background(), 1)
+    got, err := service.MethodName(context.Background(), 1)
 
     // Assert
     assert.Error(t, err)
@@ -281,10 +281,10 @@ func TestMethodName_domainError(t *testing.T) {
         GetItem(mock.Anything, mock.Anything).
         Return(nil, &DomainError{Code: "not_found"})
 
-    svc := New(repo)
+    service := New(repo)
 
     // Act
-    _, err := svc.MethodName(context.Background(), 1)
+    _, err := service.MethodName(context.Background(), 1)
 
     // Assert
     var domainErr *DomainError

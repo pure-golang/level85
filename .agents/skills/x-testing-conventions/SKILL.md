@@ -232,10 +232,10 @@ func TestService_Do(t *testing.T) {
             t.Parallel()
 
             // Arrange
-            svc := tt.setup(t)
+            service := tt.setup(t)
 
             // Act
-            got, err := svc.Do(context.Background())
+            got, err := service.Do(context.Background())
 
             // Assert
             tt.verify(t, got, err)
