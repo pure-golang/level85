@@ -118,7 +118,7 @@ tasks:
 
   bdd:
     desc: "Run all BDD scenarios"
-    cmd: go test -tags bdd -count=1 -p 8 ./test/bdd/steps/...
+    cmd: go test -tags bdd -count=1 -p 8 -timeout 10m ./test/bdd/steps/...
 
   bdd-pending:
     desc: "Show pending (unimplemented) steps"

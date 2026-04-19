@@ -86,6 +86,7 @@
 | test matrix document | `x-test-matrix` |
 | первичная диагностика test/env/service | `x-troubleshooting` |
 | TDLib-адаптер, `clientAdapter`, тестовая стратегия Telegram | `x-tdlib` |
+| gqlgen: `gqlgen.yml`, раскладка generated vs resolvers, тонкие резолверы | `x-gqlgen` |
 
 Если у правила уже есть владелец, в остальных местах оставляй только короткую ссылку, а не пересказ.
 
