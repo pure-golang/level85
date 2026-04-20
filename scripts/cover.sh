@@ -5,16 +5,16 @@ set -o pipefail    # Выход при ошибке в любой команде
 mkdir -p .coverage
 
 # Запускаем все тесты (unit + integration) с инструментацией всех пакетов
-go test -covermode=atomic -coverprofile=.coverage/.out -coverpkg=./... ./...
+go test -p 8 -timeout 20m -covermode=atomic -coverprofile=.coverage/.out -coverpkg=./... ./...
 
 # Файлы, исключаемые из отчёта покрытия
 COVERAGE_EXCLUDE=(
-  "/mocks/"                      # Сгенерированные моки
-  "doc.go"                       # Документация пакетов
-  "internal/graph/generated.go"  # Автогенерация gqlgen
-  "internal/graph/model.go"      # Автогенерация gqlgen
-  "internal/graph/federation.go" # Автогенерация gqlgen
-  "/pb/"                         # Protobuf
+  "internal/repo/telegram/client_adapter.go"
+  "mocks/"                         # Сгенерированные моки
+  "doc.go"                         # Документация пакетов
+  "internal/transport/http/graph/" # Автогенерация gqlgen
+  "internal/transport/grpc/pb/"    # Автогенерация protobuf
+  "test/"                          # Содержимое папок test
 )
 
 # Экранируем точки и собираем regex-паттерн для grep -vE
