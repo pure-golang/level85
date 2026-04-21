@@ -58,7 +58,7 @@ func TestLogin_InvalidPassword(t *testing.T) {
 ```
 
 ```gherkin
-Scenario: 02. Отказ при неверном пароле
+Scenario: 02_reject_invalid_password
   Given зарегистрирован пользователь "user@example.com"
   When пользователь вводит "user@example.com" и неверный пароль
   Then система отвечает ошибкой "неверные учётные данные"
