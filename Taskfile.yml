@@ -1,5 +1,9 @@
 version: "3"
 
+# для переиспользования env - в дочерних проектах .taskrc.yml 
+#
+# experiments:
+#  ENV_PRECEDENCE: 1
 env:
   # Подавляет warnings для MacOS
   CGO_LDFLAGS: "-O2 -g -Wl,-w -Wl,-no_warn_duplicate_libraries"
@@ -70,12 +74,12 @@ tasks:
   test:
     desc: "Run all tests"
     cmds:
-      - go test -p 8 -timeout 20m -race -failfast -count=1 ./...
-
-  test-v:
-    desc: "Run all tests with verbose output"
-    cmds:
       - go test -p 8 -timeout 20m -v -race -failfast -count=1 ./...
+
+  test-cache:
+    desc: "Run all tests with cache"
+    cmds:
+      - go test -p 8 -timeout 20m -v -race -failfast ./...
 
   test-short:
     desc: "Run short tests"
@@ -118,9 +122,9 @@ tasks:
 
   bdd:
     desc: "Run all BDD scenarios"
-    cmd: go test -p 1 -timeout 20m -count=1 ./test/bdd/steps/...
+    cmd: go test -p 1 -timeout 20m -count=1 ./test/bdd/...
 
   bdd-pending:
     desc: "Show pending (unimplemented) steps"
     cmd: |
-      go test -p 1 -failfast -count=1 ./test/bdd/steps/ -godog.format=pretty 2>&1 | grep -i pending
+      go test -p 1 -failfast -count=1 ./test/bdd/ -godog.format=pretty 2>&1 | grep -i pending
