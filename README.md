@@ -91,7 +91,7 @@ brew install jq
 
 - установить голосовой ввод: [Handy](https://handy.computer/) или [FluidVoice](https://altic.dev/fluid)
 
-- установить [Ghostty](https://ghostty.org/)
+- установить [Warp](https://www.warp.dev/)
 
 ## Весёлые картинки
 
