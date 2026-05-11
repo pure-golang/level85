@@ -50,7 +50,7 @@ compatibility: ../adapters
 ### 6. Покрой тестами
 
 - unit рядом с кодом
-- integration через `x-integration-testing`, если нужен реальный внешний сервис
+- integration через `x-testcontainers-go`, если нужен реальный внешний сервис
 
 ## Короткий чек-лист
 
@@ -70,5 +70,5 @@ compatibility: ../adapters
 - `x-env-config`
 - `x-log`
 - `x-observability`
-- `x-integration-testing`
+- `x-testcontainers-go`
 - `x-unit-test-partial-interface`

@@ -56,6 +56,8 @@
 - import alias для адаптеров: префикс `a` + краткое имя
 - если в репозитории есть `Taskfile`, предпочитай его raw `go` командам
 - корневой `Taskfile.yml` подключает базовые таски через `includes.common` из родительского `../level85/Taskfile.yml`; перед тем как добавить новый таск, обязательно прочитай родительский файл и проверь, нет ли его там — если есть, просто вызывай через `task <name>`, не дублируй
+- если репозиторий использует `go.work`, не добавляй `replace` или фиктивные `require` для локальных workspace-модулей; сначала проверяй `go.work`
+- после `go mod tidy` вызывай `go work sync`
 - начинай с минимального scope команды и эскалируй только при необходимости
 - быстрая локальная петля — `task test-short` (unit); полный прогон с integration/bdd — `task test` (долго). Детали слоёв и их маркеров — `x-testing-conventions`
 - `-short` не используется для сокрытия падающих тестов
@@ -78,6 +80,7 @@
 | `doc.go`, package contract, doc comments | `x-doc-go` |
 | частично применяемые интерфейсы, типы в их сигнатурах, запрет дублировать domain внешних библиотек | `x-unit-test-partial-interface` |
 | test layers, `t.Parallel()`, `testing.Short()`, AAA, `t.Cleanup` | `x-testing-conventions` |
+| testcontainers-go, запуск внешних сервисов в тестах | `x-testcontainers-go` |
 | BDD layout и нумерация сценариев | `x-bdd-godog` |
 | продуктовый путь BDD (`PRD -> .feature`) | `x-bdd-product-workflow` |
 | разработческий путь BDD (`red -> green -> blue`) | `x-bdd-dev-workflow` |

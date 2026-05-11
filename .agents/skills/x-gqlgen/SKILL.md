@@ -9,7 +9,7 @@ description: "Применяй когда работаешь с GraphQL чере
 
 ## Когда применять
 
-- добавляешь или меняешь GraphQL-схему в `internal/transport/http/graph/*.graphqls`
+- добавляешь или меняешь GraphQL-схему в `internal/transport/http/graphql/*.graphqls`
 - пишешь или правишь резолверы
 - настраиваешь или меняешь `gqlgen.yml`
 - интегрируешь GraphQL-handler в HTTP-роутер
@@ -31,7 +31,7 @@ gqlgen-пакет с generated-кодом — это **контракт, а не
 ```
 internal/transport/http/
   transport.go                   — HTTP-сервер, монтирует /graphql и /playground
-  graph/                         — контракт (аналог grpc/pb/)
+  graphql/                         — контракт (аналог grpc/pb/)
     doc.go
     schema.graphqls              — source of truth
     generated.go                 — gqlgen exec, single-file layout
@@ -43,7 +43,7 @@ internal/transport/http/
     <name>.resolvers.go          — генерируемые стабы, заполняются вручную
 ```
 
-Пакеты: `graph` для контракта, `model` для моделей, `resolvers` для имплементации. Имя `resolvers` намеренно отличается от `graph`, чтобы при импорте было очевидно, что лежит в каждом пакете.
+Пакеты: `graphql` для контракта, `model` для моделей, `resolvers` для имплементации. Имя `resolvers` намеренно отличается от `graphql`, чтобы при импорте было очевидно, что лежит в каждом пакете.
 
 ## gqlgen.yml
 
@@ -51,15 +51,15 @@ internal/transport/http/
 
 ```yaml
 schema:
-  - internal/transport/http/graph/*.graphqls
+  - internal/transport/http/graphql/*.graphqls
 
 exec:
-  package: graph
+  package: graphql
   layout: single-file
-  filename: internal/transport/http/graph/generated.go
+  filename: internal/transport/http/graphql/generated.go
 
 model:
-  filename: internal/transport/http/graph/model/models_gen.go
+  filename: internal/transport/http/graphql/model/models_gen.go
   package: model
 
 resolver:
@@ -95,8 +95,8 @@ models:
 
 ```yaml
 federation:
-  filename: internal/transport/http/graph/federation.go
-  package: graph
+  filename: internal/transport/http/graphql/federation.go
+  package: graphql
   version: 2
 ```
 
@@ -122,7 +122,7 @@ type statusService interface {
     GetStatus(ctx context.Context) (*domain.Status, error)
 }
 
-// Resolver реализует graph.ResolverRoot.
+// Resolver реализует graphql.ResolverRoot.
 type Resolver struct {
     statusService statusService
 }
@@ -173,14 +173,14 @@ resolver := resolvers.New(statusService, ...)
 httpTransport := httptransport.New(authService, resolver)
 ```
 
-`transport/http/transport.go` монтирует GraphQL-маршруты через `handler.NewDefaultServer(graph.NewExecutableSchema(graph.Config{Resolvers: resolver}))`:
+`transport/http/transport.go` монтирует GraphQL-маршруты через `handler.NewDefaultServer(graphql.NewExecutableSchema(graphql.Config{Resolvers: resolver}))`:
 
 ```go
 import (
     "github.com/99designs/gqlgen/graphql/handler"
     "github.com/99designs/gqlgen/graphql/playground"
 
-    "some-project-url/internal/transport/http/graph"
+    "some-project-url/internal/transport/http/graphql"
     "some-project-url/internal/transport/http/resolvers"
 )
 
@@ -193,7 +193,7 @@ func (t *Transport) EnrichRoutes(mux *http.ServeMux) {
     // ... REST routes
     if t.resolver != nil {
         srv := handler.NewDefaultServer(
-            graph.NewExecutableSchema(graph.Config{Resolvers: t.resolver}),
+            graphql.NewExecutableSchema(graphql.Config{Resolvers: t.resolver}),
         )
         mux.Handle("POST /graphql", srv)
         mux.Handle("GET /playground", playground.Handler("GraphQL", "/graphql"))
