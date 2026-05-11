@@ -11,20 +11,20 @@
 
 **Структура тестов:**
 - `internal/**/*_test.go` — юнит-тесты рядом с исходниками, `t.Parallel()`
-- `test/integration/*_test.go` — интеграционные тесты, `testing.Short()` skip
-- `test/bdd/steps/*_test.go` + `test/bdd/features/` — BDD-тесты, `testing.Short()` skip
-- `test/e2e/*_test.go` — e2e-тесты, build tag `e2e`
+- `features/NN_epic/*.feature` — Gherkin-сценарии
+- `{{api_bdd_runner_path}}` — API BDD runner, если есть
+- `{{browser_bdd_runner_path}}` — browser BDD runner, если есть
 - `test/smoke/*_test.go` — смоук-тесты, build tag `smoke`
 
 ---
 
 ## Покрытие по пакетам
 
-| Пакет | Unit-тесты | Интеграция |
-|-------|-----------|------------|
-| {{package_1}} | {{unit_status_1}} | {{integration_status_1}} |
-| {{package_2}} | {{unit_status_2}} | {{integration_status_2}} |
-| {{package_3}} | {{unit_status_3}} | {{integration_status_3}} |
+| Пакет | Unit-тесты | BDD/Smoke покрытие |
+|-------|-----------|--------------------|
+| {{package_1}} | {{unit_status_1}} | {{bdd_smoke_status_1}} |
+| {{package_2}} | {{unit_status_2}} | {{bdd_smoke_status_2}} |
+| {{package_3}} | {{unit_status_3}} | {{bdd_smoke_status_3}} |
 
 ---
 
@@ -52,45 +52,42 @@
 
 ---
 
-## Интеграционные тесты (test/integration/)
-
-Требуют: {{integration_requirements}}. Skip: `testing.Short()`.
-
-### {{integration_section_name_1}} ({{integration_test_file_1}})
-
-| ID | Тест | Статус |
-|----|------|--------|
-| {{integration_test_id_1}} | {{integration_test_name_1}} | {{integration_test_status_1}} |
-| {{integration_test_id_2}} | {{integration_test_name_2}} | {{integration_test_status_2}} |
-
----
-
-## BDD-тесты (test/bdd/)
-
-Требуют: {{bdd_requirements}}. Skip: `testing.Short()`.
+## Feature inventory (features/)
 
 ### {{bdd_section_name_1}}
 
-Feature: `{{bdd_feature_file_1}}`  
-Steps: `{{bdd_steps_file_1}}`
+Feature: `{{bdd_feature_file_1}}`
 
-| ID | Сценарий | Статус |
-|----|----------|--------|
-| {{bdd_test_id_1}} | {{bdd_test_name_1}} | {{bdd_test_status_1}} |
-| {{bdd_test_id_2}} | {{bdd_test_name_2}} | {{bdd_test_status_2}} |
+| ID | Сценарий | Execution tags | API BDD | Browser BDD |
+|----|----------|----------------|---------|-------------|
+| {{bdd_test_id_1}} | {{bdd_test_name_1}} | {{bdd_tags_1}} | {{api_bdd_status_1}} | {{browser_bdd_status_1}} |
+| {{bdd_test_id_2}} | {{bdd_test_name_2}} | {{bdd_tags_2}} | {{api_bdd_status_2}} | {{browser_bdd_status_2}} |
 
 ---
 
-## E2E-тесты (test/e2e/)
+## API BDD runner ({{api_bdd_runner_path}})
 
-Требуют: {{e2e_requirements}}. Build tag: `e2e`.
+Требует: {{api_bdd_requirements}}. Текущий runner: {{api_bdd_runner}}.
 
-Файл: `{{e2e_test_file_1}}` {{e2e_file_status_1}}
+Steps: `{{api_bdd_steps_file_1}}`
 
 | ID | Тест | Статус |
 |----|------|--------|
-| {{e2e_test_id_1}} | {{e2e_test_name_1}} | {{e2e_test_status_1}} |
-| {{e2e_test_id_2}} | {{e2e_test_name_2}} | {{e2e_test_status_2}} |
+| {{api_bdd_test_id_1}} | {{api_bdd_test_name_1}} | {{api_bdd_test_status_1}} |
+| {{api_bdd_test_id_2}} | {{api_bdd_test_name_2}} | {{api_bdd_test_status_2}} |
+
+---
+
+## Browser BDD runner ({{browser_bdd_runner_path}})
+
+Требует: {{browser_bdd_requirements}}. Текущий runner: {{browser_bdd_runner}}.
+
+Steps: `{{browser_bdd_steps_file_1}}`
+
+| ID | Тест | Статус |
+|----|------|--------|
+| {{browser_bdd_test_id_1}} | {{browser_bdd_test_name_1}} | {{browser_bdd_test_status_1}} |
+| {{browser_bdd_test_id_2}} | {{browser_bdd_test_name_2}} | {{browser_bdd_test_status_2}} |
 
 ---
 
@@ -109,12 +106,12 @@ Steps: `{{bdd_steps_file_1}}`
 
 ## Сводная таблица
 
-| Пакет | Unit | Integration/E2E | Smoke |
-|-------|------|-----------------|-------|
-| {{summary_package_1}} | {{summary_unit_1}} | {{summary_integration_1}} | {{summary_smoke_1}} |
-| {{summary_package_2}} | {{summary_unit_2}} | {{summary_integration_2}} | {{summary_smoke_2}} |
-| {{summary_package_3}} | {{summary_unit_3}} | {{summary_integration_3}} | {{summary_smoke_3}} |
-| **Итого** | **{{summary_total_unit}}** | **{{summary_total_integration}}** | **{{summary_total_smoke}}** |
+| Пакет | Unit | API BDD | Browser BDD | Smoke |
+|-------|------|---------|-------------|-------|
+| {{summary_package_1}} | {{summary_unit_1}} | {{summary_api_bdd_1}} | {{summary_browser_bdd_1}} | {{summary_smoke_1}} |
+| {{summary_package_2}} | {{summary_unit_2}} | {{summary_api_bdd_2}} | {{summary_browser_bdd_2}} | {{summary_smoke_2}} |
+| {{summary_package_3}} | {{summary_unit_3}} | {{summary_api_bdd_3}} | {{summary_browser_bdd_3}} | {{summary_smoke_3}} |
+| **Итого** | **{{summary_total_unit}}** | **{{summary_total_api_bdd}}** | **{{summary_total_browser_bdd}}** | **{{summary_total_smoke}}** |
 
 ---
 

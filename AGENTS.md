@@ -35,13 +35,12 @@
 | Слой | Расположение | Назначение |
 |---|---|---|
 | unit | `*_test.go` рядом с кодом | алгоритмы, чистые функции, компоненты с моками |
-| integration | `test/integration/` | технический контракт адаптеров и репозиториев |
-| bdd | `test/bdd/NN_epic/` | бизнес-сценарии через godog |
-| e2e | `test/e2e/` | интеграция с реальными staging-сервисами |
+| features | `features/NN_epic/*.feature` | Gherkin-сценарии |
+| api-bdd | monorepo: `backend/test/bdd/`; backend-only: `test/bdd/` | BDD через публичный API |
+| browser-bdd | monorepo: `frontend/test/bdd/`; frontend-only: `test/bdd/` | BDD через браузер |
 | smoke | `test/smoke/` | liveness/readiness собранного стека |
 
-- shared test setup для integration/bdd/e2e живёт в `test/support/`
-- `.feature` файлы живут рядом с `bdd_test.go` своего эпика: `test/bdd/NN_epic/*.feature`
+- `.feature` файлы живут в общем каталоге `features/NN_epic/*.feature`; runner-ы держат только реализацию шагов и wiring
 - API-контракты (`.graphqls`, `.proto`) физически живут рядом с generated кодом в `internal/transport/<proto>/`; `api/<proto>/` — каталог симлинков для быстрой навигации
 
 ### Глобальные соглашения
@@ -59,7 +58,7 @@
 - если репозиторий использует `go.work`, не добавляй `replace` или фиктивные `require` для локальных workspace-модулей; сначала проверяй `go.work`
 - после `go mod tidy` вызывай `go work sync`
 - начинай с минимального scope команды и эскалируй только при необходимости
-- быстрая локальная петля — `task test-short` (unit); полный прогон с integration/bdd — `task test` (долго). Детали слоёв и их маркеров — `x-testing-conventions`
+- быстрая локальная петля — `task test-short` (unit); BDD и smoke запускаются точечно. Детали слоёв и их маркеров — `x-testing-conventions`
 - `-short` не используется для сокрытия падающих тестов
 - `//nolint:<linter>` применяется только в исключительных случаях, когда поправить код корректно невозможно или дороже, чем оставить подавление
 - `//nolint:<linter>` сопровождается коротким объяснением через `//`, например: `//nolint:errcheck // close в defer, ошибка не влияет на результат`
@@ -79,9 +78,10 @@
 |---|---|
 | `doc.go`, package contract, doc comments | `x-doc-go` |
 | частично применяемые интерфейсы, типы в их сигнатурах, запрет дублировать domain внешних библиотек | `x-unit-test-partial-interface` |
-| test layers, `t.Parallel()`, `testing.Short()`, AAA, `t.Cleanup` | `x-testing-conventions` |
+| test layers, `t.Parallel()`, build tags, AAA, `t.Cleanup` | `x-testing-conventions` |
 | testcontainers-go, запуск внешних сервисов в тестах | `x-testcontainers-go` |
-| BDD layout и нумерация сценариев | `x-bdd-godog` |
+| BDD feature layout, API BDD, godog runner, `@api` в monorepo | `x-bdd-api` |
+| browser BDD, playwright-bdd runner, `@browser` в monorepo | `x-bdd-browser` |
 | продуктовый путь BDD (`PRD -> .feature`) | `x-bdd-product-workflow` |
 | разработческий путь BDD (`red -> green -> blue`) | `x-bdd-dev-workflow` |
 | legacy harvest в `.feature` | `x-bdd-knowledge-harvest` |

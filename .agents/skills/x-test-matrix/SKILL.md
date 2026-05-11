@@ -1,7 +1,7 @@
 ---
 name: "x-test-matrix"
-description: "Применяй когда нужно создать или актуализировать `docs/TEST-MATRIX.md` в сервисном репозитории: инвентаризация test layers, покрытие по пакетам, перечень test cases, сводная таблица и секция code coverage. Формат должен повторять project template из `assets/TEST-MATRIX.md.tmpl` без самовольной переработки структуры"
-compatibility: Go monorepo or service repo with unit/integration/bdd/e2e/smoke tests
+description: "Применяй когда нужно создать или актуализировать `docs/TEST-MATRIX.md` в сервисном репозитории: инвентаризация test layers, feature inventory, покрытие runner-ами, перечень test cases, сводная таблица и секция code coverage. Формат должен повторять project template из `assets/TEST-MATRIX.md.tmpl` без самовольной переработки структуры"
+compatibility: Go or frontend monorepo/service repo with unit, BDD and smoke tests
 ---
 # Матрица тестирования
 
@@ -32,9 +32,9 @@ compatibility: Go monorepo or service repo with unit/integration/bdd/e2e/smoke t
 
 Матрица нужна, когда в репозитории есть прикладной сервис с понятными test layers:
 - `internal/**/*_test.go`
-- `test/integration/`
-- `test/bdd/`
-- `test/e2e/`
+- `features/`
+- API BDD runner: monorepo `backend/test/bdd/`, backend-only `test/bdd/`
+- browser BDD runner: monorepo `frontend/test/bdd/`, frontend-only `test/bdd/`
 - `test/smoke/`
 
 Если репозиторий содержит только toolchain, skills, CI или вспомогательные scripts, не создавай `docs/TEST-MATRIX.md` автоматически.
@@ -45,7 +45,10 @@ compatibility: Go monorepo or service repo with unit/integration/bdd/e2e/smoke t
 - какие слои реально существуют
 - где лежат тестовые файлы
 - какие пакеты покрыты unit-тестами
-- какие сценарии покрыты integration / bdd / e2e / smoke
+- какие сценарии есть в `features/`
+- какие сценарии покрыты API BDD runner-ом
+- какие сценарии покрыты browser BDD runner-ом
+- какие smoke-проверки есть
 
 Сначала считай фактические файлы и каталоги, а уже потом формулируй выводы.
 
@@ -56,7 +59,7 @@ compatibility: Go monorepo or service repo with unit/integration/bdd/e2e/smoke t
 - основные внешние интерфейсы
 - основные инфраструктурные зависимости
 - укрупнённую архитектуру по пакетам
-- структуру тестов по слоям
+- структуру `features/` и runner-ов по слоям
 
 Это не маркетинговое описание и не README.
 Нужен плотный технический контекст, который помогает читать остальную матрицу.
@@ -66,7 +69,7 @@ compatibility: Go monorepo or service repo with unit/integration/bdd/e2e/smoke t
 Сделай краткую таблицу:
 - пакет
 - есть ли unit-тесты
-- есть ли integration / e2e / smoke покрытие
+- есть ли покрытие через API BDD, browser BDD или smoke
 
 Используй её как быстрый индекс перед детальными разделами.
 
@@ -76,6 +79,9 @@ compatibility: Go monorepo or service repo with unit/integration/bdd/e2e/smoke t
 - выдели отдельный раздел
 - перечисли файлы
 - зафиксируй test cases таблицами `ID | Тест | Статус`
+- для BDD не считай наличие `.feature` автоматическим покрытием runner-а
+- в monorepo отдельно показывай execution coverage по `@api` и `@browser`
+- в backend-only/frontend-only показывай coverage единственного runner-а без execution tags
 
 Если слой отсутствует, не выдумывай для него фиктивный список тестов.
 Но структура итогового документа должна оставаться узнаваемой и близкой к шаблону.
@@ -90,8 +96,8 @@ ID должны быть:
 Предпочтительный паттерн:
 - package/layer prefix (`CFG`, `CTRL`, `REPO`, `SVC`, `GQL`, `GRPC`)
 - для unit допустим `-U-`
-- для integration `INT-`
-- для e2e `E2E-`
+- для API BDD `API-BDD-`
+- для browser BDD `BROWSER-BDD-`
 - для smoke `SMOKE-`
 
 Не перенумеровывай существующие ID без необходимости.
@@ -102,7 +108,7 @@ ID должны быть:
 После детальных разделов добавь агрегированную таблицу по пакетам и слоям.
 Она должна давать быстрый ответ:
 - сколько unit-тестов есть по каждому пакету
-- где покрытие идёт через integration / e2e / smoke
+- где покрытие идёт через API BDD, browser BDD или smoke
 
 ### 8. Добавь секцию покрытия кода
 
@@ -123,7 +129,7 @@ ID должны быть:
 - порядок разделов совпадает с шаблоном
 - названия пакетов и файлов совпадают с реальной структурой репозитория
 - количество тестов в сводной таблице не противоречит детальным разделам
-- не смешаны unit, integration, bdd, e2e и smoke
+- не смешаны unit, feature inventory, API BDD, browser BDD и smoke
 - нет ссылок на чужие сервисы, чужие пакеты и внешний эталонный репозиторий
 
 ## Не делай
