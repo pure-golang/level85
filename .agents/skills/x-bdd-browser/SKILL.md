@@ -95,7 +95,6 @@ npx playwright test
 ```json
 {
   "scripts": {
-    "bdd:gen": "bddgen",
     "test:bdd": "bddgen && playwright test"
   }
 }

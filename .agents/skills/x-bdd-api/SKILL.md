@@ -193,7 +193,7 @@ backend/test/bdd/             # monorepo
 
 **Ограничения:**
 - Правка любого step-файла инвалидирует BDD-cache всего runner package.
-- `task test-bdd` должен запускать один package API runner-а.
+- `task test-bdd` (или `task backend:test-bdd` для monorepo) должен запускать один package API runner-а.
 - Для проверки без кеша используй ручной `go test -count=1 ...`, но task по умолчанию может оставаться кешируемым.
 - Build tag `bdd` должен стоять на всех `.go` файлах с BDD-runner, stack и steps, чтобы обычный `go test ./...` не компилировал BDD stack и testcontainers-зависимости.
 - Если в пакете без tag не остаётся файлов, добавь лёгкий `stub.go` с `//go:build !bdd` и только `package bdd`.
@@ -323,7 +323,7 @@ BDD_PATHS=features/01_epic/01_story.feature \
   go test -count=1 -tags bdd ./backend/test/bdd/ -godog.name="^01[A-Z]?_some_use_case"
 
 go test -count=1 -tags bdd ./backend/test/bdd/ -run TestSomeEpic
-task test-bdd
+task backend:test-bdd
 ```
 
 Backend-only:

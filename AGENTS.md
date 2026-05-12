@@ -58,7 +58,7 @@
 - если репозиторий использует `go.work`, не добавляй `replace` или фиктивные `require` для локальных workspace-модулей; сначала проверяй `go.work`
 - после `go mod tidy` вызывай `go work sync`
 - начинай с минимального scope команды и эскалируй только при необходимости
-- быстрая локальная петля — `task test-short` (unit); BDD и smoke запускаются точечно. Детали слоёв и их маркеров — `x-testing-conventions`
+- для запуска тестов см. детали слоёв и их маркеров — `x-testing-conventions`
 - `-short` не используется для сокрытия падающих тестов
 - `//nolint:<linter>` применяется только в исключительных случаях, когда поправить код корректно невозможно или дороже, чем оставить подавление
 - `//nolint:<linter>` сопровождается коротким объяснением через `//`, например: `//nolint:errcheck // close в defer, ошибка не влияет на результат`
@@ -95,6 +95,7 @@
 | первичная диагностика test/env/service | `x-troubleshooting` |
 | TDLib-адаптер, `clientAdapter`, тестовая стратегия Telegram | `x-tdlib` |
 | gqlgen: `gqlgen.yml`, раскладка generated vs resolvers, тонкие резолверы | `x-gqlgen` |
+| AntD v6 + Tailwind CSS: подключение, cascade layers, `@layer components`, scoped `.ant-*` overrides | `x-antd` |
 
 Если у правила уже есть владелец, в остальных местах оставляй только короткую ссылку, а не пересказ.
 
